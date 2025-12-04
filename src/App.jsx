@@ -154,10 +154,17 @@ function App() {
             />
           )}
 
-          {activeTab === "SWOT & Actions" && (
-            <SwotPlaceholder />
-          )}
-        </section>
+         {activeTab === "SWOT & Actions" && (
+          <SwotTab
+            data={data}
+            fixedTotal={fixedTotal}
+            variableTotal={variableTotal}
+            totalIncome={totalIncome}
+            totalExpenses={totalExpenses}
+            monthlySavings={monthlySavings}
+            totalInvestments={totalInvestments}
+          />
+        )}
 
         <aside className="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-800 bg-slate-950/90 px-4 py-5 flex flex-col gap-4">
           <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3">
@@ -906,35 +913,266 @@ function FireTab({ data, totalExpenses, totalInvestments, monthlySavings }) {
   );
 }
 
-function SwotPlaceholder() {
+function SwotTab({
+  data,
+  fixedTotal,
+  variableTotal,
+  totalIncome,
+  totalExpenses,
+  monthlySavings,
+  totalInvestments,
+}) {
+  const result = computeFinHealth(
+    data,
+    fixedTotal,
+    variableTotal,
+    totalIncome,
+    totalExpenses,
+    monthlySavings,
+    totalInvestments
+  );
+
+  const { savingsRate, emiRatio, efMonths, healthAdequacy, lifeAdequacy, invCoverage } =
+    result.metrics;
+
+  const strengths = [];
+  const weaknesses = [];
+  const opportunities = [];
+  const threats = [];
+
+  // Strengths
+  if (savingsRate >= 0.25) {
+    strengths.push(
+      `Strong savings discipline – saving about ${Math.round(
+        savingsRate * 100
+      )}% of monthly income.`
+    );
+  } else if (savingsRate >= 0.18) {
+    strengths.push(
+      `Decent savings rate of ~${Math.round(
+        savingsRate * 100
+      )}%. With a few tweaks you can cross 25%.`
+    );
+  }
+
+  if (emiRatio < 0.25 && data.totalEmi > 0) {
+    strengths.push(
+      `EMI load is under control at ~${Math.round(
+        emiRatio * 100
+      )}% of income.`
+    );
+  }
+
+  if (efMonths >= 6) {
+    strengths.push(
+      `Solid emergency fund – can handle about ${efMonths.toFixed(
+        1
+      )} months of expenses.`
+    );
+  }
+
+  if (healthAdequacy >= 100) {
+    strengths.push("Health insurance cover roughly matches Indian benchmarks.");
+  }
+  if (lifeAdequacy >= 60) {
+    strengths.push(
+      "Life / term insurance is reasonably aligned to income and dependents."
+    );
+  }
+
+  if (invCoverage >= 60) {
+    strengths.push(
+      "Investments are compounding well compared to a typical 10–15 year target."
+    );
+  }
+
+  // Weaknesses
+  if (savingsRate < 0.15) {
+    weaknesses.push(
+      `Low savings rate (~${Math.round(
+        savingsRate * 100
+      )}%). Any shock can derail goals.`
+    );
+  }
+
+  if (emiRatio >= 0.35) {
+    weaknesses.push(
+      `High EMI burden – about ${Math.round(
+        emiRatio * 100
+      )}% of income goes to EMIs.`
+    );
+  }
+
+  if (efMonths < 3) {
+    weaknesses.push(
+      `Emergency fund is thin at only ${efMonths.toFixed(
+        1
+      )} months of expenses.`
+    );
+  }
+
+  if (healthAdequacy < 80) {
+    weaknesses.push(
+      "Health insurance cover is below typical 5–10L Indian benchmark."
+    );
+  }
+
+  if (lifeAdequacy < 40 && totalIncome > 0) {
+    weaknesses.push(
+      "Life / term cover is low compared to the ideal ~15x annual income."
+    );
+  }
+
+  if (invCoverage < 40) {
+    weaknesses.push(
+      "Long-term investments are behind where they should be for future goals."
+    );
+  }
+
+  // Opportunities
+  if (savingsRate < 0.25) {
+    opportunities.push(
+      "Push savings rate towards 25–30% by trimming non-essential variable spends and negotiating income growth."
+    );
+  } else {
+    opportunities.push(
+      "Channel your strong savings rate into a structured SIP plan mapped to clear goals (FIRE, kids’ education, house, etc.)."
+    );
+  }
+
+  if (emiRatio >= 0.25 && emiRatio < 0.45) {
+    opportunities.push(
+      "Use bonuses or surplus cash to prepay high-interest loans and bring EMIs under 25% of income."
+    );
+  }
+
+  if (efMonths < 6) {
+    opportunities.push(
+      "Direct part of monthly surplus into an emergency bucket (FDs / liquid MFs) until you reach 6 months of expenses."
+    );
+  }
+
+  if (healthAdequacy < 120) {
+    opportunities.push(
+      "Explore floater health plans or super-topups to raise cover without huge premium jumps."
+    );
+  }
+
+  if (lifeAdequacy < 100 && totalIncome > 0) {
+    opportunities.push(
+      "Top up term cover (online level-term plans) to move closer to 15x annual income."
+    );
+  }
+
+  if (invCoverage < 100) {
+    opportunities.push(
+      "Increase SIPs into diversified equity mutual funds (Nifty 50 / Nifty Next 50 / flexi-cap) to accelerate towards your FIRE corpus."
+    );
+  }
+
+  // Threats
+  if (emiRatio >= 0.45) {
+    threats.push(
+      "Job loss or income dip could quickly become unmanageable with current EMI burden."
+    );
+  }
+  if (efMonths < 1) {
+    threats.push(
+      "No real emergency buffer – even a 1–2 month disruption may force you into fresh debt."
+    );
+  }
+  if (healthAdequacy === 0) {
+    threats.push(
+      "No health insurance – a single hospitalisation can wipe out savings or push you into debt."
+    );
+  }
+  if (lifeAdequacy === 0 && data.dependents > 0) {
+    threats.push(
+      "Dependents are fully exposed if the primary earner is not around; term cover is critical."
+    );
+  }
+  if (invCoverage === 0 && monthlySavings > 0) {
+    threats.push(
+      "Surplus cash is not being invested; inflation will silently erode its value over time."
+    );
+  }
+
+  // Fallbacks so the cards are never empty
+  if (!strengths.length) {
+    strengths.push(
+      "You have taken the first step by measuring your money flows – that alone is a big strength compared to most households."
+    );
+  }
+  if (!weaknesses.length) {
+    weaknesses.push(
+      "No major structural weaknesses detected from the current numbers. Keep revisiting annually."
+    );
+  }
+  if (!opportunities.length) {
+    opportunities.push(
+      "You can fine-tune tax optimisation, asset allocation and goal-based investing as your income grows."
+    );
+  }
+  if (!threats.length) {
+    threats.push(
+      "Main risk is behavioural – inconsistent investing or overreacting to market volatility."
+    );
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <h1 className="text-xl font-semibold">SWOT & Action Plan</h1>
-      <p className="text-sm text-slate-300 max-w-xl">
-        Later we&apos;ll convert your numbers into Strengths, Weaknesses,
-        Opportunities and Threats with a short action list.
+      <p className="text-sm text-slate-300 max-w-2xl">
+        Based on your Bharat FinHealth Index, expenses, EMIs and protection, here&apos;s a quick
+        SWOT view of your finances and where to act next.
       </p>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="flex flex-wrap gap-3 text-xs">
+        <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-200">
+          BFI: <span className="font-semibold">{Math.round(result.score)}</span> / 100 ·{" "}
+          {result.bandLabel}
+        </span>
+        <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-400">
+          Savings: {Math.round(savingsRate * 100) || 0}% · EMIs:{" "}
+          {Math.round(emiRatio * 100) || 0}% of income
+        </span>
+        <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-400">
+          EF: {efMonths.toFixed(1)} months · Health: {healthAdequacy}% · Life:{" "}
+          {lifeAdequacy}%
+        </span>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
         <Card title="Strengths">
-          <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
-            Example: high savings rate, low EMI burden, solid EF.
-          </div>
+          <ul className="list-disc list-inside text-xs text-slate-200 space-y-1">
+            {strengths.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
         </Card>
+
         <Card title="Weaknesses">
-          <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
-            Example: underinsurance, no EF, overreliance on one asset.
-          </div>
+          <ul className="list-disc list-inside text-xs text-slate-200 space-y-1">
+            {weaknesses.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
         </Card>
+
         <Card title="Opportunities">
-          <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
-            Example: increase SIP, tax optimisation, better allocation.
-          </div>
+          <ul className="list-disc list-inside text-xs text-slate-200 space-y-1">
+            {opportunities.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
         </Card>
+
         <Card title="Threats">
-          <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
-            Example: job loss with high EMIs, medical risk, liquidity crunch.
-          </div>
+          <ul className="list-disc list-inside text-xs text-slate-200 space-y-1">
+            {threats.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
         </Card>
       </div>
     </div>
