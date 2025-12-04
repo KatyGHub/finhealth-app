@@ -13,6 +13,7 @@ function App() {
 
   const [user, setUser] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [hasStarted, setHasStarted] = useState(false);
 
   const [data, setData] = useState({
     age: 30,
@@ -128,6 +129,33 @@ function App() {
     data.invGold +
     data.invOthers;
 
+  // Flow gating: loading → auth landing → profile onboarding → main dashboard
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+        <div className="text-sm text-slate-400">Loading your session…</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthLanding onLogin={handleLogin} />;
+  }
+
+  if (!hasStarted) {
+    return (
+      <ProfileOnboarding
+        data={data}
+        update={update}
+        onContinue={() => setHasStarted(true)}
+        onLogout={handleLogout}
+        user={user}
+      />
+    );
+  }
+
+  // Main dashboard (PFI journey)
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between bg-slate-950/80 backdrop-blur">
@@ -152,9 +180,7 @@ function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            {isAuthLoading ? (
-              <span className="text-slate-500">Checking login…</span>
-            ) : user ? (
+            {user ? (
               <>
                 <span className="text-slate-300 max-w-[160px] truncate">
                   {user.user_metadata?.full_name || user.email}
@@ -1590,6 +1616,191 @@ function MetricChip({ label, value, comment }) {
 function formatCurrency(num) {
   const safe = Number(num) || 0;
   return "₹" + safe.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+}
+
+function AuthLanding({ onLogin }) {
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4">
+      <div className="max-w-xl w-full rounded-3xl border border-slate-800 bg-slate-900/80 p-6 md:p-8 space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-sm font-semibold text-emerald-300">
+            FH
+          </div>
+          <div>
+            <div className="text-lg font-semibold tracking-wide">
+              Findependence – Build Wealth. Retire Earlier.
+            </div>
+            <div className="text-xs text-slate-400">
+              FinHealth – Indian Portfolio &amp; FIRE Coach
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2 text-sm text-slate-300">
+          <p>
+            Track your <span className="font-semibold">Portfolio FinHealth Index (PFI)</span>, savings
+            rate and FIRE number, tailored for Indian investors.
+          </p>
+          <ul className="list-disc list-inside text-slate-400 text-xs md:text-sm space-y-1">
+            <li>Map income, expenses, EMIs and investments in one place</li>
+            <li>Check if your health + term cover is adequate</li>
+            <li>Get FIRE targets and SIP ideas using Indian return assumptions</li>
+          </ul>
+        </div>
+
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={onLogin}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 text-slate-950 px-4 py-2.5 text-sm font-semibold hover:bg-emerald-400"
+          >
+            Sign in with Google to start
+          </button>
+          <p className="text-[11px] text-slate-500 text-center">
+            We only use your email to keep your PFI journey and portfolio saved.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileOnboarding({ data, update, onContinue, onLogout, user }) {
+  const handleContinue = () => {
+    if (!data.age || data.age <= 0) {
+      alert("Add your age to continue");
+      return;
+    }
+    if (!data.employmentType) {
+      alert("Select your employment type");
+      return;
+    }
+    onContinue();
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+      <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between bg-slate-950/80 backdrop-blur">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xs font-semibold text-emerald-300">
+            FH
+          </div>
+          <div>
+            <div className="text-base font-semibold tracking-wide">
+              Findependence – Build Wealth. Retire Earlier.
+            </div>
+            <div className="text-xs text-slate-400">
+              FinHealth – Indian Portfolio &amp; FIRE Coach
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 text-xs text-slate-400">
+          <span className="hidden md:inline text-slate-300 max-w-[160px] truncate">
+            {user?.user_metadata?.full_name || user?.email}
+          </span>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="rounded-full border border-slate-700 px-3 py-1 text-slate-200 hover:bg-slate-800"
+          >
+            Sign out
+          </button>
+        </div>
+      </header>
+
+      <main className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-3xl rounded-3xl border border-slate-800 bg-slate-900/80 p-6 md:p-8 space-y-6">
+          <div>
+            <h1 className="text-xl font-semibold mb-1">
+              Let&apos;s set up your profile
+            </h1>
+            <p className="text-sm text-slate-400">
+              We&apos;ll use this to personalise your Portfolio FinHealth Index
+              (PFI) and FIRE recommendations.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4 text-sm">
+            <div className="space-y-1.5">
+              <label className="block text-xs text-slate-400">Your age</label>
+              <input
+                type="number"
+                className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                value={data.age}
+                onChange={(e) =>
+                  update({ age: Number(e.target.value) || 0 })
+                }
+                min={18}
+                max={80}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs text-slate-400">Dependents</label>
+              <input
+                type="number"
+                className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                value={data.dependents}
+                onChange={(e) =>
+                  update({ dependents: Number(e.target.value) || 0 })
+                }
+                min={0}
+                max={10}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs text-slate-400">
+                Employment type
+              </label>
+              <select
+                className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                value={data.employmentType}
+                onChange={(e) => update({ employmentType: e.target.value })}
+              >
+                <option value="">Select</option>
+                <option value="salaried">Salaried</option>
+                <option value="business">
+                  Self-employed / Business owner
+                </option>
+                <option value="freelancer">Freelancer / Consultant</option>
+                <option value="student">Student</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs text-slate-400">City type</label>
+              <select
+                className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                value={data.cityTier}
+                onChange={(e) => update({ cityTier: e.target.value })}
+              >
+                <option value="metro">Metro / Tier 1</option>
+                <option value="tier2">Tier 2</option>
+                <option value="tier3">Tier 3 / Others</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <p className="text-xs text-slate-400 max-w-md">
+              You can tweak these later in the journey. Next, we&apos;ll map
+              your income and spends to calculate your first PFI score.
+            </p>
+            <button
+              type="button"
+              onClick={handleContinue}
+              className="inline-flex items-center justify-center rounded-full bg-emerald-500 text-slate-950 px-5 py-2 text-sm font-semibold hover:bg-emerald-400"
+            >
+              Start my PFI journey
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 }
 
 export default App;
