@@ -52,6 +52,7 @@ function App() {
 
   const [data, setData] = useState(INITIAL_DATA);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const [pfiHistory, setPfiHistory] = useState([]);
 
   // 1) Auth session: check existing session + listen for changes
   useEffect(() => {
@@ -97,6 +98,7 @@ function App() {
       await supabase.auth.signOut();
       setHasStarted(false);
       setData(INITIAL_DATA);
+      setPfiHistory([]);
     } catch (err) {
       console.error("Error logging out", err);
     }
@@ -148,7 +150,7 @@ function App() {
       if (rows && rows.length > 0 && rows[0].data) {
         // Existing user: merge saved data with defaults
         setData({ ...INITIAL_DATA, ...rows[0].data });
-        setHasStarted(true); // they already had a profile, skip onboarding next time
+        setHasStarted(true); // they already had a profile once
       } else {
         // First-time user: create default row
         await saveProfileToSupabase(INITIAL_DATA);
@@ -163,21 +165,89 @@ function App() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // 4) Auto-save profile when data changes
   useEffect(() => {
     if (!user) return;
-    if (isProfileLoading) return; // don’t save while we’re still loading it
+    if (isProfileLoading) return; // don’t save while loading
 
     const timeout = setTimeout(() => {
       saveProfileToSupabase(data);
     }, 1200); // save 1.2s after last change
 
     return () => clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, user, isProfileLoading]);
+
+  // 5) Load PFI history for this user
+  useEffect(() => {
+    if (!user) {
+      setPfiHistory([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadHistory() {
+      const { data: rows, error } = await supabase
+        .from("portfolio_history")
+        .select("id, created_at, pfi")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true });
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error("Error loading PFI history", error);
+        return;
+      }
+
+      setPfiHistory(
+        (rows || []).map((row) => ({
+          id: row.id,
+          createdAt: row.created_at,
+          pfi: Number(row.pfi),
+        }))
+      );
+    }
+
+    loadHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  // 6) Save a PFI snapshot to Supabase + update local history
+  async function savePfiSnapshot(pfiValue) {
+    if (!user) return;
+
+    const payload = {
+      user_id: user.id,
+      pfi: pfiValue,
+      snapshot: data,
+    };
+
+    const { data: rows, error } = await supabase
+      .from("portfolio_history")
+      .insert(payload)
+      .select("id, created_at, pfi")
+      .single();
+
+    if (error) {
+      console.error("Error saving PFI snapshot", error);
+      return;
+    }
+
+    setPfiHistory((prev) => [
+      ...prev,
+      {
+        id: rows.id,
+        createdAt: rows.created_at,
+        pfi: Number(rows.pfi),
+      },
+    ]);
+  }
 
   function update(partial) {
     setData((prev) => ({ ...prev, ...partial }));
@@ -260,6 +330,11 @@ function App() {
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald-400 mr-1" />
             Live simulator · Updates as you fill details
+            {isProfileLoading && (
+              <span className="ml-2 text-slate-500">
+                Syncing with cloud…
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -318,6 +393,8 @@ function App() {
               totalExpenses={totalExpenses}
               monthlySavings={monthlySavings}
               totalInvestments={totalInvestments}
+              pfiHistory={pfiHistory}
+              onSaveSnapshot={savePfiSnapshot}
             />
           )}
 
