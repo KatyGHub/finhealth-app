@@ -232,6 +232,7 @@ function App() {
             </p>
           </div>
         </aside>
+      </section>
       </main>
     </div>
   );
