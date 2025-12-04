@@ -811,6 +811,53 @@ function InputDetailsTab({
 
 /* ---------- Score tab with real index ---------- */
 
+function computePFI({
+  savingsRate,
+  emergencyFundMonths,
+  emiToIncome,
+  protectionRatio,
+}) {
+  // 0–40 pts: savings rate (target 40% or more)
+  const sr =
+    savingsRate <= 0
+      ? 0
+      : savingsRate >= 0.4
+      ? 40
+      : Math.round((savingsRate / 0.4) * 40);
+
+  // 0–20 pts: emergency fund (target 6 months of expenses)
+  const ef =
+    emergencyFundMonths >= 6
+      ? 20
+      : Math.round((emergencyFundMonths / 6) * 20);
+
+  // 0–20 pts: EMI stress (target <= 30% of income)
+  const emiScore =
+    emiToIncome >= 0.6
+      ? 0
+      : emiToIncome <= 0.3
+      ? 20
+      : Math.round(((0.6 - emiToIncome) / 0.3) * 20);
+
+  // 0–20 pts: life cover adequacy vs target
+  const prot =
+    protectionRatio >= 1
+      ? 20
+      : Math.round(protectionRatio * 20);
+
+  const total = sr + ef + emiScore + prot;
+
+  return {
+    total,
+    breakdown: {
+      sr,
+      ef,
+      emiScore,
+      prot,
+    },
+  };
+}
+
 function ScoreTab({
   data,
   fixedTotal,
@@ -819,349 +866,622 @@ function ScoreTab({
   totalExpenses,
   monthlySavings,
   totalInvestments,
+  pfiHistory,
+  onSaveSnapshot,
 }) {
-  const result = computeFinHealth(
-    data,
-    fixedTotal,
-    variableTotal,
-    totalIncome,
-    totalExpenses,
-    monthlySavings,
-    totalInvestments
-  );
+  const savingsRate =
+    totalIncome > 0 ? monthlySavings / totalIncome : 0;
 
-  const color =
-    result.score >= 80
-      ? "text-emerald-400"
-      : result.score >= 60
-      ? "text-lime-300"
-      : result.score >= 45
-      ? "text-amber-300"
-      : "text-red-400";
+  const emergencyFundMonths =
+    totalExpenses > 0 ? data.emergencyFund / totalExpenses : 0;
 
-  const gaugeBg =
-    result.score >= 80
-      ? "from-emerald-500/60 via-emerald-400/40 to-emerald-500/10"
-      : result.score >= 60
-      ? "from-lime-400/60 via-lime-300/40 to-lime-400/10"
-      : result.score >= 45
-      ? "from-amber-400/60 via-amber-300/40 to-amber-400/10"
-      : "from-red-500/60 via-red-400/40 to-red-500/10";
+  const emiToIncome =
+    totalIncome > 0 ? data.totalEmi / totalIncome : 0;
+
+  // Heuristic life cover target = 15x annual income
+  const annualIncome = totalIncome * 12;
+  const targetLifeCover = annualIncome * 15;
+  const protectionRatio =
+    targetLifeCover > 0 ? data.lifeCover / targetLifeCover : 0;
+
+  const { total: pfiScore, breakdown } = computePFI({
+    savingsRate,
+    emergencyFundMonths,
+    emiToIncome,
+    protectionRatio,
+  });
+
+  const roundedPFI = Math.max(0, Math.min(100, pfiScore));
+
+  const handleSaveClick = () => {
+    if (onSaveSnapshot) {
+      onSaveSnapshot(roundedPFI);
+    }
+  };
 
   return (
-    <div className="space-y-5">
-      <h1 className="text-xl font-semibold">Your Portfolio FinHealth Index</h1>
-      <p className="text-sm text-slate-300 max-w-2xl">
-        The Portfolio FinHealth Index (PFI) is a 0–100 score built for Indian
-        households. It looks at savings rate, EMI burden, emergency fund,
-        insurance cover and investments.
-      </p>
+    <div className="space-y-4">
+      {/* Main PFI card */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:p-5">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+          <div>
+            <div className="text-xs font-semibold text-emerald-300">
+              Portfolio FinHealth Index (PFI)
+            </div>
+            <div className="text-[11px] text-slate-400 max-w-md">
+              Composite score combining savings strength, emergency fund,
+              EMI stress and protection cover – tuned for Indian investors.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveClick}
+            className="inline-flex items-center justify-center rounded-full bg-emerald-500 text-slate-950 px-3 py-1.5 text-xs font-semibold hover:bg-emerald-400"
+          >
+            Save this PFI checkpoint
+          </button>
+        </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr),minmax(0,3fr)]">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 flex flex-col items-center justify-center">
-          <div className="relative h-40 w-40 mb-4">
-            <div
-              className={`absolute inset-0 rounded-full bg-gradient-to-tr ${gaugeBg}`}
-            />
-            <div className="absolute inset-3 rounded-full bg-slate-950 border border-slate-800 flex flex-col items-center justify-center">
-              <div className={`text-4xl font-bold ${color}`}>
-                {Math.round(result.score)}
-              </div>
-              <div className="text-xs text-slate-400 mt-1">
-                out of 100 PFI
-              </div>
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col items-center justify-center rounded-2xl bg-slate-950 border border-slate-800 px-6 py-4">
+            <div className="text-[10px] text-slate-400 mb-1">
+              Current PFI
+            </div>
+            <div className="text-4xl font-semibold text-emerald-400 leading-none">
+              {roundedPFI}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1">
+              / 100
+            </div>
+            <div className="text-[11px] text-slate-500 mt-2 text-center max-w-[160px]">
+              Higher is better. Focus on improving one pillar at a time.
             </div>
           </div>
 
-          <div className={`text-base font-semibold ${color}`}>
-            {result.bandLabel}
-          </div>
-          <div className="text-xs text-slate-400 mt-1 text-center max-w-xs">
-            {result.bandText}
-          </div>
-        </div>
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            {/* Savings strength */}
+            <div>
+              <div className="flex justify-between mb-1">
+                <span>Savings strength</span>
+                <span>
+                  {breakdown.sr}/40 ·{" "}
+                  {Math.round((savingsRate || 0) * 100)}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500"
+                  style={{ width: `${(breakdown.sr / 40) * 100}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Aim for 20–30%+ savings rate for aggressive FIRE.
+              </p>
+            </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 space-y-4 text-sm">
-          <h2 className="text-sm font-semibold">Why your BFI looks like this</h2>
-          <div className="grid gap-3 md:grid-cols-2 text-xs">
-            <MetricChip
-              label="Savings rate"
-              value={`${Math.round(result.metrics.savingsRate * 100) || 0}%`}
-              comment={result.comments.savings}
-            />
-            <MetricChip
-              label="EMI burden"
-              value={`${Math.round(result.metrics.emiRatio * 100) || 0}% of income`}
-              comment={result.comments.emi}
-            />
-            <MetricChip
-              label="Emergency fund"
-              value={`${result.metrics.efMonths.toFixed(1)} months`}
-              comment={result.comments.ef}
-            />
-            <MetricChip
-              label="Protection cover"
-              value={`Health: ${result.metrics.healthAdequacy}% · Life: ${result.metrics.lifeAdequacy}%`}
-              comment={result.comments.protection}
-            />
-            <MetricChip
-              label="Investments vs target"
-              value={`${result.metrics.invCoverage}% of long-term target`}
-              comment={result.comments.investments}
-            />
-          </div>
+            {/* Emergency fund */}
+            <div>
+              <div className="flex justify-between mb-1">
+                <span>Emergency fund</span>
+                <span>
+                  {breakdown.ef}/20 ·{" "}
+                  {emergencyFundMonths.toFixed(1)} months
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500"
+                  style={{ width: `${(breakdown.ef / 20) * 100}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Target 6 months of expenses in liquid funds / safe options.
+              </p>
+            </div>
 
-          <div className="pt-2">
-            <h3 className="text-sm font-semibold mb-2">
-              Priority actions to improve your BFI
-            </h3>
-            <ul className="list-disc list-inside text-xs text-slate-300 space-y-1">
-              {result.actions.map((a) => (
-                <li key={a}>{a}</li>
-              ))}
-            </ul>
+            {/* EMI load */}
+            <div>
+              <div className="flex justify-between mb-1">
+                <span>EMI load</span>
+                <span>
+                  {breakdown.emiScore}/20 ·{" "}
+                  {Math.round((emiToIncome || 0) * 100)}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500"
+                  style={{ width: `${(breakdown.emiScore / 20) * 100}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Keep total EMIs under 30% of take-home for comfort.
+              </p>
+            </div>
+
+            {/* Protection cover */}
+            <div>
+              <div className="flex justify-between mb-1">
+                <span>Protection cover</span>
+                <span>
+                  {breakdown.prot}/20 ·{" "}
+                  {Math.round((protectionRatio || 0) * 100)}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500"
+                  style={{ width: `${(breakdown.prot / 20) * 100}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Life cover of ~15x annual income + strong health insurance.
+              </p>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* PFI history chart */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="text-xs font-semibold text-slate-300">
+              PFI history
+            </div>
+            <div className="text-[11px] text-slate-500">
+              Each checkpoint is stored when you click &quot;Save this PFI
+              checkpoint&quot;. This shows how your Portfolio FinHealth
+              Index has moved over time.
+            </div>
+          </div>
+        </div>
+
+        {!pfiHistory || pfiHistory.length === 0 ? (
+          <div className="text-[11px] text-slate-500">
+            No history yet. Save your first PFI checkpoint to start tracking
+            progress.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="w-full h-28 md:h-32 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-center px-2">
+              <Sparkline history={pfiHistory} />
+            </div>
+            <div className="text-[11px] text-slate-500 flex justify-between">
+              <span>Oldest on the left, latest on the right.</span>
+              <span>
+                Checkpoints: {pfiHistory.length} · Latest PFI:{" "}
+                {pfiHistory[pfiHistory.length - 1].pfi}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+function Sparkline({ history }) {
+  const points = history.map((h, idx) => ({
+    x: idx,
+    y: h.pfi,
+  }));
+
+  if (points.length === 0) return null;
+  if (points.length === 1) {
+    points.push({ x: 1, y: points[0].y });
+  }
+
+  const maxX = points.length - 1 || 1;
+  const maxY = 100;
+  const width = 260;
+  const height = 80;
+  const padding = 8;
+
+  const path = points
+    .map((p, idx) => {
+      const x =
+        padding + (p.x / maxX) * (width - padding * 2);
+      const y =
+        height -
+        (padding + (p.y / maxY) * (height - padding * 2));
+      return `${idx === 0 ? "M" : "L"} ${x} ${y}`;
+    })
+    .join(" ");
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="w-full h-full"
+      preserveAspectRatio="none"
+    >
+      <path
+        d={path}
+        fill="none"
+        stroke="rgb(52 211 153)"
+        strokeWidth="1.5"
+      />
+      {points.map((p, idx) => {
+        const x =
+          padding + (p.x / maxX) * (width - padding * 2);
+        const y =
+          height -
+          (padding + (p.y / maxY) * (height - padding * 2));
+        return (
+          <circle
+            key={idx}
+            cx={x}
+            cy={y}
+            r="2"
+            fill="rgb(52 211 153)"
+          />
+        );
+      })}
+    </svg>
   );
 }
 
 /* ---------- FIRE / SWOT sections ---------- */
 
 function FireTab({ data, totalExpenses, totalInvestments, monthlySavings }) {
-  const [returnRate, setReturnRate] = useState(12); // 10–14% typical equity MF range in India
+  const [retirementAge, setRetirementAge] = useState(
+    data.age ? Math.min(Math.max(data.age + 20, 50), 65) : 60
+  );
+  const [swr, setSwr] = useState(0.0375); // 3.75% SWR – conservative for India
+  const [expectedReturn, setExpectedReturn] = useState(11); // Equity-heavy portfolio
+  const [inflation, setInflation] = useState(5.5); // Long-term Indian inflation assumption
 
-  const age = data.age || 30;
+  const currentAge = data.age || 30;
+  const yearsToRetire = Math.max(retirementAge - currentAge, 0);
+  const monthsToRetire = yearsToRetire * 12;
+
   const annualExpenses = totalExpenses * 12;
+  const fireCorpus =
+    swr > 0 ? annualExpenses / swr : 0;
 
-  // If user hasn't filled expenses yet, show a gentle nudge
-  if (!annualExpenses) {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-xl font-semibold">FIRE & SIP Planning</h1>
-        <p className="text-sm text-slate-300 max-w-xl">
-          To calculate your FIRE number, we need your monthly expenses first.
-          Go back to Input Details and add fixed + variable spends.
-        </p>
+  const realReturn =
+    expectedReturn > inflation
+      ? (expectedReturn - inflation) / 100
+      : 0.01; // 1% real if they set weird numbers
 
-        <Card title="What you&apos;ll see here">
-          <ul className="list-disc list-inside text-xs text-slate-300 space-y-1">
-            <li>Lean, Normal and Fat FIRE corpus based on your expenses</li>
-            <li>Time to FIRE and age at FIRE</li>
-            <li>Required monthly SIP and one-time lumpsum to reach each target</li>
-          </ul>
-        </Card>
-      </div>
-    );
+  const monthlyReturn = realReturn / 12;
+
+  let sipRequired = 0;
+  if (monthsToRetire > 0) {
+    if (monthlyReturn > 0) {
+      const factor =
+        ((1 + monthlyReturn) ** monthsToRetire - 1) /
+        monthlyReturn;
+      sipRequired = fireCorpus / factor;
+    } else {
+      sipRequired = fireCorpus / monthsToRetire;
+    }
   }
 
-  // Years you’ll keep investing (target: 60; minimum: 5)
-  const yearsToFireBase = Math.max(5, 60 - age);
-  const rYear = returnRate / 100;
-  const rMonth = rYear / 12;
-  const nMonths = yearsToFireBase * 12;
+  const atCurrentSavingsYears = (() => {
+    if (monthlySavings <= 0) return null;
 
-  const plans = [
-    {
-      id: "lean",
-      label: "Lean FIRE",
-      multiple: 20,
-      tag: "20x annual expenses – minimalist lifestyle",
-    },
-    {
-      id: "normal",
-      label: "Normal FIRE",
-      multiple: 25,
-      tag: "25x annual expenses – standard 4% withdrawal rate",
-    },
-    {
-      id: "fat",
-      label: "Fat FIRE",
-      multiple: 40,
-      tag: "40x annual expenses – more travel, upgrades and buffer",
-    },
-  ];
+    // rough numeric approximation: how many years to reach fireCorpus
+    // using current monthlySavings and same expectedReturn
+    const r = realReturn;
+    const m = monthlySavings;
 
-  const makePlanStats = (plan) => {
-    const targetCorpus = annualExpenses * plan.multiple;
-    const achievedPct = targetCorpus
-      ? Math.min((totalInvestments / targetCorpus) * 100, 100)
-      : 0;
-    const gap = Math.max(targetCorpus - totalInvestments, 0);
-
-    let requiredSip = 0;
-    if (gap > 0 && nMonths > 0) {
-      if (rMonth > 0) {
-        const factor = Math.pow(1 + rMonth, nMonths) - 1;
-        requiredSip = (gap * rMonth) / factor;
-      } else {
-        requiredSip = gap / nMonths;
-      }
+    if (r <= 0) {
+      return fireCorpus > 0 ? fireCorpus / (m * 12) : null;
     }
 
-    let requiredLumpsum = 0;
-    if (gap > 0) {
-      requiredLumpsum = gap / Math.pow(1 + rYear, yearsToFireBase);
-    }
+    // Solve approximate months n from:
+    // fireCorpus ≈ m * [((1+r/12)^n - 1)/(r/12)]
+    const mr = r / 12;
+    const lhs = (fireCorpus * mr) / m + 1;
+    if (lhs <= 1) return null;
 
-    const canRetireNow = gap <= 0;
+    const n = Math.log(lhs) / Math.log(1 + mr);
+    const years = n / 12;
+    return years;
+  })();
 
-    return {
-      targetCorpus,
-      achievedPct,
-      gap,
-      requiredSip,
-      requiredLumpsum,
-      canRetireNow,
-    };
-  };
+  const equityAllocation =
+    currentAge <= 30
+      ? 0.75
+      : currentAge <= 40
+      ? 0.7
+      : currentAge <= 50
+      ? 0.6
+      : 0.5;
+
+  const goldSilverAllocation = 0.1; // 10% in gold/silver
+  const debtAllocation = 1 - equityAllocation - goldSilverAllocation;
+
+  const equityCorpusTarget = fireCorpus * equityAllocation;
+  const debtCorpusTarget = fireCorpus * debtAllocation;
+  const goldSilverCorpusTarget =
+    fireCorpus * goldSilverAllocation;
 
   return (
-    <div className="space-y-5">
-      <h1 className="text-xl font-semibold">FIRE & SIP Planning</h1>
-      <p className="text-sm text-slate-300 max-w-2xl">
-        Based on your current expenses and investments, we estimate how big a
-        corpus you need for Lean / Normal / Fat FIRE. We assume long-term
-        equity mutual fund returns of{" "}
-        <span className="font-semibold">{returnRate}% p.a.</span> (pre-tax).
-      </p>
+    <div className="space-y-4">
+      {/* FIRE number */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:p-5 space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold text-emerald-300">
+              FIRE number – Financial Independence target
+            </div>
+            <div className="text-[11px] text-slate-400 max-w-md">
+              We estimate how much corpus you need so you can live on
+              investment returns, assuming a safe withdrawal rate and
+              Indian inflation.
+            </div>
+          </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="text-slate-400">Expected return (p.a.)</span>
-          <div className="inline-flex rounded-full bg-slate-900 border border-slate-700 p-1">
-            {[10, 12, 14].map((rate) => {
-              const selected = rate === returnRate;
-              return (
-                <button
-                  key={rate}
-                  type="button"
-                  onClick={() => setReturnRate(rate)}
-                  className={
-                    "px-3 py-1 rounded-full transition " +
-                    (selected
-                      ? "bg-emerald-500 text-slate-950 font-semibold"
-                      : "text-slate-200 hover:bg-slate-800")
-                  }
-                >
-                  {rate}%
-                </button>
-              );
-            })}
+          <div className="flex gap-2 items-center text-xs">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-500">
+                Target retirement age
+              </span>
+              <input
+                type="number"
+                className="w-20 rounded-xl bg-slate-950 border border-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                min={currentAge}
+                max={70}
+                value={retirementAge}
+                onChange={(e) =>
+                  setRetirementAge(
+                    Number(e.target.value) || retirementAge
+                  )
+                }
+              />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-500">
+                SWR (%)
+              </span>
+              <input
+                type="number"
+                step="0.25"
+                className="w-20 rounded-xl bg-slate-950 border border-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                value={(swr * 100).toFixed(2)}
+                onChange={(e) =>
+                  setSwr(
+                    Math.max(
+                      0.02,
+                      Math.min(
+                        0.05,
+                        (Number(e.target.value) || 3.75) / 100
+                      )
+                    )
+                  )
+                }
+              />
+            </div>
           </div>
         </div>
-        <div className="text-slate-400">
-          Current monthly savings:{" "}
-          <span className="text-slate-100 font-medium">
-            {formatCurrency(monthlySavings)}
-          </span>
+
+        <div className="grid md:grid-cols-3 gap-4 text-xs mt-3">
+          <div className="rounded-2xl bg-slate-950 border border-slate-800 px-4 py-3">
+            <div className="text-[10px] text-slate-500">
+              Annual expenses (today)
+            </div>
+            <div className="text-sm font-semibold text-slate-100">
+              {formatCurrency(annualExpenses)}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Based on your current monthly expenses input.
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-slate-950 border border-slate-800 px-4 py-3">
+            <div className="text-[10px] text-slate-500">
+              Target FIRE corpus (today&apos;s money)
+            </div>
+            <div className="text-sm font-semibold text-emerald-400">
+              {formatCurrency(fireCorpus)}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Approx value needed so you can withdraw{" "}
+              {(swr * 100).toFixed(2)}% per year sustainably.
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-slate-950 border border-slate-800 px-4 py-3">
+            <div className="text-[10px] text-slate-500">
+              Time until target
+            </div>
+            <div className="text-sm font-semibold text-slate-100">
+              {yearsToRetire} years
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              We adjust for your current age ({currentAge}).
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {plans.map((plan) => {
-          const stats = makePlanStats(plan);
-          const yearsToFire = yearsToFireBase;
-          const ageAtFire = age + yearsToFire;
-
-          return (
-            <div
-              key={plan.id}
-              className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-3 flex flex-col justify-between"
-            >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-semibold">
-                      {plan.label}
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      {plan.tag}
-                    </div>
-                  </div>
-                  <div className="text-xs rounded-full border border-slate-700 px-2 py-0.5 text-slate-300">
-                    Target corpus
-                  </div>
-                </div>
-                <div className="text-lg font-semibold text-emerald-300">
-                  {formatCurrency(stats.targetCorpus)}
-                </div>
-
-                <div className="space-y-1 text-[11px]">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Progress</span>
-                    <span className="text-slate-200">
-                      {Math.round(stats.achievedPct)}% achieved
-                    </span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500"
-                      style={{
-                        width: `${stats.achievedPct}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {!stats.canRetireNow && (
-                  <div className="grid grid-cols-2 gap-2 text-[11px] mt-2">
-                    <div className="rounded-xl bg-slate-950/70 border border-slate-800 p-2">
-                      <div className="text-slate-400">Time to FIRE</div>
-                      <div className="text-slate-100 font-semibold">
-                        {yearsToFire} years
-                      </div>
-                      <div className="text-slate-500">
-                        Age at FIRE: {Math.round(ageAtFire)} yrs
-                      </div>
-                    </div>
-                    <div className="rounded-xl bg-slate-950/70 border border-slate-800 p-2">
-                      <div className="text-slate-400">
-                        Required monthly SIP
-                      </div>
-                      <div className="text-slate-100 font-semibold">
-                        {stats.requiredSip
-                          ? formatCurrency(stats.requiredSip)
-                          : "₹0"}
-                      </div>
-                      <div className="text-slate-500">
-                        At {returnRate}% p.a. till age ~60
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {stats.canRetireNow && (
-                  <div className="mt-2 rounded-xl bg-emerald-500/10 border border-emerald-500/40 p-2 text-[11px] text-emerald-200">
-                    Your current investments already meet this FIRE target on
-                    paper. Double-check lifestyle assumptions and taxes before
-                    quitting your job.
-                  </div>
-                )}
-              </div>
-
-              {!stats.canRetireNow && (
-                <div className="pt-2 border-t border-slate-800 mt-2 text-[11px] space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">
-                      If investing as lumpsum today
-                    </span>
-                    <span className="text-slate-100 font-semibold">
-                      {stats.requiredLumpsum
-                        ? formatCurrency(stats.requiredLumpsum)
-                        : "₹0"}
-                    </span>
-                  </div>
-                  <div className="text-slate-500">
-                    Invest this amount now at {returnRate}% p.a. to reach the
-                    target by age ~60 (ignoring future tax changes).
-                  </div>
-                </div>
-              )}
+      {/* SIP planner */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:p-5 space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold text-slate-300">
+              SIP planner – what you need to invest monthly
             </div>
-          );
-        })}
+            <div className="text-[11px] text-slate-500 max-w-md">
+              Uses a real return assumption (expected return minus
+              inflation) based on a diversified equity–debt–gold portfolio.
+            </div>
+          </div>
+
+          <div className="flex gap-3 text-xs">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-500">
+                Expected portfolio return (% p.a.)
+              </span>
+              <input
+                type="number"
+                className="w-24 rounded-xl bg-slate-950 border border-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                value={expectedReturn}
+                onChange={(e) =>
+                  setExpectedReturn(
+                    Math.max(
+                      4,
+                      Math.min(16, Number(e.target.value) || 11)
+                    )
+                  )
+                }
+              />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-500">
+                Inflation (% p.a.)
+              </span>
+              <input
+                type="number"
+                className="w-20 rounded-xl bg-slate-950 border border-slate-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                value={inflation}
+                onChange={(e) =>
+                  setInflation(
+                    Math.max(
+                      3,
+                      Math.min(8, Number(e.target.value) || 5.5)
+                    )
+                  )
+                }
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-4 text-xs mt-3">
+          <div className="rounded-2xl bg-slate-950 border border-slate-800 px-4 py-3">
+            <div className="text-[10px] text-slate-500">
+              Required SIP / month
+            </div>
+            <div className="text-sm font-semibold text-emerald-400">
+              {sipRequired > 0
+                ? formatCurrency(sipRequired)
+                : "—"}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              To reach your FIRE corpus over {yearsToRetire} years with the
+              above assumptions.
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-slate-950 border border-slate-800 px-4 py-3">
+            <div className="text-[10px] text-slate-500">
+              Current monthly savings
+            </div>
+            <div className="text-sm font-semibold text-slate-100">
+              {formatCurrency(monthlySavings)}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              This is your current surplus (income minus expenses).
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-slate-950 border border-slate-800 px-4 py-3">
+            <div className="text-[10px] text-slate-500">
+              If you just invest current surplus…
+            </div>
+            <div className="text-sm font-semibold text-slate-100">
+              {atCurrentSavingsYears
+                ? `${atCurrentSavingsYears.toFixed(1)} years`
+                : "Add savings to see"}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Rough estimate of how long it takes to reach FIRE if you only
+              invest today&apos;s surplus.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Suggested asset mix – Indian context */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:p-5 space-y-3">
+        <div className="text-xs font-semibold text-slate-300">
+          Suggested portfolio bands (India)
+        </div>
+        <div className="text-[11px] text-slate-500 max-w-2xl">
+          This is not investment advice – just typical bands many Indian
+          investors use for long-term wealth creation. Always research
+          specific funds and products yourself.
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-4 text-xs mt-2">
+          <div className="rounded-2xl bg-slate-950 border border-slate-800 px-4 py-3 space-y-1">
+            <div className="font-semibold text-slate-200">
+              Equity ({Math.round(equityAllocation * 100)}%)
+            </div>
+            <ul className="list-disc list-inside text-[11px] text-slate-400 space-y-1">
+              <li>
+                Core via Nifty 50 / Sensex index funds (large-cap).
+              </li>
+              <li>
+                Satellite via flexi-cap / mid-cap funds if your risk
+                tolerance allows.
+              </li>
+              <li>
+                Keep direct stocks as a smaller satellite if you have the
+                time and skill.
+              </li>
+            </ul>
+            <div className="text-[11px] text-emerald-400 mt-1">
+              Target corpus in equity: {formatCurrency(equityCorpusTarget)}
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-slate-950 border border-slate-800 px-4 py-3 space-y-1">
+            <div className="font-semibold text-slate-200">
+              Debt / safety ({Math.round(debtAllocation * 100)}%)
+            </div>
+            <ul className="list-disc list-inside text-[11px] text-slate-400 space-y-1">
+              <li>
+                Emergency corpus in liquid / money market funds or sweep FD.
+              </li>
+              <li>
+                Short-duration debt funds or high-quality corporate/government
+                bonds for stability.
+              </li>
+              <li>
+                Avoid chasing high yield credit risk funds unless you fully
+                understand the risks.
+              </li>
+            </ul>
+            <div className="text-[11px] text-emerald-400 mt-1">
+              Target corpus in debt: {formatCurrency(debtCorpusTarget)}
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-slate-950 border border-slate-800 px-4 py-3 space-y-1">
+            <div className="font-semibold text-slate-200">
+              Gold &amp; silver (~
+              {Math.round(goldSilverAllocation * 100)}%)
+            </div>
+            <ul className="list-disc list-inside text-[11px] text-slate-400 space-y-1">
+              <li>
+                Gold ETFs / gold mutual funds or Sovereign Gold Bonds (SGB)
+                for long-term allocation.
+              </li>
+              <li>
+                Silver ETFs as a smaller satellite position if you are okay
+                with higher volatility.
+              </li>
+              <li>
+                Keep jewellery out of this, as it has making charges and is
+                not pure investment exposure.
+              </li>
+            </ul>
+            <div className="text-[11px] text-emerald-400 mt-1">
+              Target corpus in gold/silver:{" "}
+              {formatCurrency(goldSilverCorpusTarget)}
+            </div>
+          </div>
+        </div>
+
+        <div className="text-[11px] text-slate-500 mt-2">
+          You can adapt these bands over time as you near retirement
+          (gradually shifting from equity into debt and short-duration
+          options to protect your corpus).
+        </div>
       </div>
     </div>
   );
