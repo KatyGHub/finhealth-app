@@ -865,7 +865,7 @@ function ScoreTab({
   totalIncome,
   totalExpenses,
   monthlySavings,
-  totalInvestments,
+  totalInvestments, // not used in formula yet but good to keep
   pfiHistory,
   onSaveCheckpoint,
   isSavingCheckpoint,
@@ -893,34 +893,99 @@ function ScoreTab({
   const healthCoverRatio =
     targetHealthCover > 0 ? data.healthCover / targetHealthCover : 0;
 
-  const avgProtectionRatio = (lifeCoverRatio + healthCoverRatio) / 2;
-
   const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
-  // Scoring bands – tuned for India
-  const savingsScore = clamp01(savingsRate / 0.3) * 40; // 30%+ savings = full 40
-  const emergencyScore = clamp01(emergencyMonths / 6) * 20; // 6 months = full 20
-  const emiScore =
-    emiLoad <= 0.3
-      ? 20
-      : emiLoad <= 0.4
-      ? 14
-      : emiLoad <= 0.5
-      ? 8
-      : emiLoad <= 0.6
-      ? 4
-      : 0;
-  const protectionScore = clamp01(avgProtectionRatio) * 20;
+  // STRICTER SCORING
 
-  const currentPFI = Math.round(
-    savingsScore + emergencyScore + emiScore + protectionScore
-  );
+  // Savings score (0–40)
+  // 0–5% = 0, 5–15% = up to 20, 15–25% = up to 35, 25%+ = 35–40
+  let savingsScore = 0;
+  if (savingsRate <= 0.05) {
+    savingsScore = 0;
+  } else if (savingsRate <= 0.15) {
+    savingsScore = ((savingsRate - 0.05) / 0.1) * 20;
+  } else if (savingsRate <= 0.25) {
+    savingsScore = 20 + ((savingsRate - 0.15) / 0.1) * 15;
+  } else {
+    savingsScore = 35 + Math.min(((savingsRate - 0.25) / 0.1) * 5, 5);
+  }
+  savingsScore = Math.min(40, Math.max(0, savingsScore));
 
-  // History for chart
-  const history = (pfiHistory && pfiHistory.length > 0
-    ? pfiHistory
-    : [{ pfi: currentPFI, created_at: new Date().toISOString() }]
-  ).slice(0, 60); // keep it sane
+  // Emergency fund score (0–20)
+  // <1 month = 0, 1–3 = up to 8, 3–6 = up to 16, 6–12 = 16–20, 12+ capped at 20
+  let emergencyScore = 0;
+  if (emergencyMonths < 1) {
+    emergencyScore = 0;
+  } else if (emergencyMonths <= 3) {
+    emergencyScore = ((emergencyMonths - 1) / 2) * 8;
+  } else if (emergencyMonths <= 6) {
+    emergencyScore = 8 + ((emergencyMonths - 3) / 3) * 8;
+  } else if (emergencyMonths <= 12) {
+    emergencyScore = 16 + ((emergencyMonths - 6) / 6) * 4;
+  } else {
+    emergencyScore = 20;
+  }
+  emergencyScore = Math.min(20, Math.max(0, emergencyScore));
+
+  // EMI load score (0–20)
+  // >60% = 0, 50–60% = 3, 40–50% = 7, 30–40% = 12, 20–30% = 16, <20% = 20
+  let emiScore = 0;
+  if (emiLoad > 0.6) {
+    emiScore = 0;
+  } else if (emiLoad > 0.5) {
+    emiScore = 3;
+  } else if (emiLoad > 0.4) {
+    emiScore = 7;
+  } else if (emiLoad > 0.3) {
+    emiScore = 12;
+  } else if (emiLoad > 0.2) {
+    emiScore = 16;
+  } else {
+    emiScore = 20;
+  }
+
+  // Protection score (0–20).
+  // If both life & health are basically zero, you get 0.
+  // Needs to be close to target to get the full 20.
+  const avgProtectionRatio = (lifeCoverRatio + healthCoverRatio) / 2;
+  let protectionScore = 0;
+  if (lifeCoverRatio < 0.1 && healthCoverRatio < 0.1) {
+    protectionScore = 0;
+  } else {
+    // Full marks only when avgProtectionRatio >= 1.0
+    protectionScore = clamp01(avgProtectionRatio) * 20;
+  }
+
+  // Small global penalty if EMI is high and protection is poor
+  let rawPFI = savingsScore + emergencyScore + emiScore + protectionScore;
+  if (emiLoad > 0.5 && avgProtectionRatio < 0.3) {
+    rawPFI = rawPFI * 0.8; // knock off 20%
+  }
+
+  const currentPFI = Math.round(Math.min(100, Math.max(0, rawPFI)));
+
+  // HISTORY HANDLING
+
+  // Normalise whatever Supabase sends: { pfi } OR { score }
+  const normalisedHistory =
+    pfiHistory && pfiHistory.length > 0
+      ? pfiHistory
+          .map((h) => ({
+            pfi:
+              typeof h.pfi === "number"
+                ? h.pfi
+                : typeof h.score === "number"
+                ? h.score
+                : 0,
+            created_at: h.created_at,
+          }))
+          .filter((h) => typeof h.pfi === "number")
+      : [];
+
+  const history =
+    normalisedHistory.length > 0
+      ? normalisedHistory.slice(0, 60)
+      : [{ pfi: currentPFI, created_at: new Date().toISOString() }];
 
   const chartWidth = 1000;
   const chartHeight = 120;
@@ -935,14 +1000,11 @@ function ScoreTab({
   const points = history.map((h, index) => {
     const x = paddingX + index * xStep;
     const y =
-      paddingY +
-      innerHeight -
-      (clamp01(h.pfi / 100) || 0) * innerHeight; // higher PFI = higher point
+      paddingY + innerHeight - (clamp01(h.pfi / 100) || 0) * innerHeight;
     return { x, y, pfi: h.pfi };
   });
 
   const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(" ");
-
   const latestPFI = history[history.length - 1]?.pfi ?? currentPFI;
 
   return (
@@ -959,8 +1021,8 @@ function ScoreTab({
               stress and protection cover – tuned for Indian investors.
             </p>
             <p className="text-xs md:text-sm text-slate-400">
-              Higher is better. Start by fixing one pillar at a time rather than
-              everything together.
+              Now more strict: big loans and low protection will visibly drag
+              the score down.
             </p>
           </div>
 
@@ -1004,8 +1066,8 @@ function ScoreTab({
               />
             </div>
             <p className="text-[11px] md:text-xs text-slate-400">
-              Aim for a 20–30%+ savings rate for aggressive FIRE. Under 10% is a
-              red flag.
+              Under 10% savings will keep your PFI low. Aim for 20–30%+ for a
+              truly strong score.
             </p>
           </div>
 
@@ -1022,13 +1084,13 @@ function ScoreTab({
               <div
                 className="h-full bg-emerald-500"
                 style={{
-                  width: `${Math.min(emergencyMonths / 6, 1) * 100}%`,
+                  width: `${Math.min(emergencyMonths / 12, 1) * 100}%`,
                 }}
               />
             </div>
             <p className="text-[11px] md:text-xs text-slate-400">
-              Target at least 6 months of expenses in liquid funds / safe
-              options for India.
+              Less than 3 months of expenses is fragile. 6–12 months in liquid
+              options is the safety zone.
             </p>
           </div>
 
@@ -1046,7 +1108,7 @@ function ScoreTab({
                   "h-full " +
                   (emiLoad <= 0.3
                     ? "bg-emerald-500"
-                    : emiLoad <= 0.5
+                    : emiLoad <= 0.4
                     ? "bg-amber-400"
                     : "bg-red-500")
                 }
@@ -1056,8 +1118,8 @@ function ScoreTab({
               />
             </div>
             <p className="text-[11px] md:text-xs text-slate-400">
-              Try to keep total EMIs under ~30% of take-home. Over 50% feels
-              tight and hurts savings.
+              Over 40–50% EMIs will heavily drag your PFI down until you close
+              or refinance some loans.
             </p>
           </div>
 
@@ -1076,8 +1138,8 @@ function ScoreTab({
               />
             </div>
             <p className="text-[11px] md:text-xs text-slate-400">
-              Thumb rule: life cover ≈ 15x annual income via term plan, health
-              cover ≥ ₹7.5L for metro families.
+              No term + health cover = 0/20 here. Move towards 15× income term
+              cover and ≥₹7.5L health cover to unlock full points.
             </p>
           </div>
         </div>
