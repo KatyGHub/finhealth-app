@@ -1,6 +1,41 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "./lib/supabaseClient";
 
+const INITIAL_DATA = {
+  age: 30,
+  dependents: 0,
+  employmentType: "",
+  cityTier: "metro",
+
+  incomeSelf: 0,
+  incomeSpouse: 0,
+  incomeOther: 0,
+  incomeVariable: 0,
+
+  fixedRent: 0,
+  fixedFood: 0,
+  fixedUtilities: 0,
+  fixedMedical: 0,
+
+  varWifi: 0,
+  varEntertainment: 0,
+  varShopping: 0,
+  varMisc: 0,
+
+  totalEmi: 0,
+  loanOutstanding: 0,
+
+  emergencyFund: 0,
+  healthCover: 0,
+  lifeCover: 0,
+
+  invBonds: 0,
+  invMF: 0,
+  invStocks: 0,
+  invGold: 0,
+  invOthers: 0,
+};
+
 const TABS = [
   "Input Details",
   "Your Score",
@@ -15,41 +50,10 @@ function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [hasStarted, setHasStarted] = useState(false);
 
-  const [data, setData] = useState({
-    age: 30,
-    dependents: 0,
-    employmentType: "",
-    cityTier: "metro",
+  const [data, setData] = useState(INITIAL_DATA);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
 
-    incomeSelf: 0,
-    incomeSpouse: 0,
-    incomeOther: 0,
-    incomeVariable: 0,
-
-    fixedRent: 0,
-    fixedFood: 0,
-    fixedUtilities: 0,
-    fixedMedical: 0,
-
-    varWifi: 0,
-    varEntertainment: 0,
-    varShopping: 0,
-    varMisc: 0,
-
-    totalEmi: 0,
-    loanOutstanding: 0,
-
-    emergencyFund: 0,
-    healthCover: 0,
-    lifeCover: 0,
-
-    invBonds: 0,
-    invMF: 0,
-    invStocks: 0,
-    invGold: 0,
-    invOthers: 0,
-  });
-
+  // 1) Auth session: check existing session + listen for changes
   useEffect(() => {
     let cancelled = false;
 
@@ -91,10 +95,89 @@ function App() {
   async function handleLogout() {
     try {
       await supabase.auth.signOut();
+      setHasStarted(false);
+      setData(INITIAL_DATA);
     } catch (err) {
       console.error("Error logging out", err);
     }
   }
+
+  // 2) Save current profile to Supabase
+  async function saveProfileToSupabase(currentData) {
+    if (!user) return;
+
+    const payload = {
+      id: user.id,
+      data: currentData,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from("profiles").upsert(payload);
+
+    if (error) {
+      console.error("Error saving profile", error);
+    }
+  }
+
+  // 3) Load profile whenever user changes (login)
+  useEffect(() => {
+    if (!user) {
+      setData(INITIAL_DATA);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadProfile() {
+      setIsProfileLoading(true);
+
+      const { data: rows, error } = await supabase
+        .from("profiles")
+        .select("data")
+        .eq("id", user.id)
+        .limit(1);
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error("Error loading profile", error);
+        setIsProfileLoading(false);
+        return;
+      }
+
+      if (rows && rows.length > 0 && rows[0].data) {
+        // Existing user: merge saved data with defaults
+        setData({ ...INITIAL_DATA, ...rows[0].data });
+        setHasStarted(true); // they already had a profile, skip onboarding next time
+      } else {
+        // First-time user: create default row
+        await saveProfileToSupabase(INITIAL_DATA);
+        setData(INITIAL_DATA);
+      }
+
+      setIsProfileLoading(false);
+    }
+
+    loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // 4) Auto-save profile when data changes
+  useEffect(() => {
+    if (!user) return;
+    if (isProfileLoading) return; // don’t save while we’re still loading it
+
+    const timeout = setTimeout(() => {
+      saveProfileToSupabase(data);
+    }, 1200); // save 1.2s after last change
+
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, user, isProfileLoading]);
 
   function update(partial) {
     setData((prev) => ({ ...prev, ...partial }));
@@ -131,10 +214,10 @@ function App() {
 
   // Flow gating: loading → auth landing → profile onboarding → main dashboard
 
-  if (isAuthLoading) {
+  if (isAuthLoading || (user && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
-        <div className="text-sm text-slate-400">Loading your session…</div>
+        <div className="text-sm text-slate-400">Loading your data…</div>
       </div>
     );
   }
@@ -180,28 +263,16 @@ function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            {user ? (
-              <>
-                <span className="text-slate-300 max-w-[160px] truncate">
-                  {user.user_metadata?.full_name || user.email}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="rounded-full border border-slate-700 px-3 py-1 text-slate-200 hover:bg-slate-800"
-                >
-                  Sign out
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={handleLogin}
-                className="rounded-full bg-emerald-500 text-slate-950 px-3 py-1 font-semibold hover:bg-emerald-400"
-              >
-                Sign in with Google
-              </button>
-            )}
+            <span className="text-slate-300 max-w-[160px] truncate">
+              {user.user_metadata?.full_name || user.email}
+            </span>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-full border border-slate-700 px-3 py-1 text-slate-200 hover:bg-slate-800"
+            >
+              Sign out
+            </button>
           </div>
         </div>
       </header>
