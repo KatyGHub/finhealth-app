@@ -46,15 +46,22 @@ const TABS = [
 function App() {
   const [activeTab, setActiveTab] = useState("Input Details");
 
+  // Auth state
   const [user, setUser] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [hasStarted, setHasStarted] = useState(false);
 
+  // Main profile data
   const [data, setData] = useState(INITIAL_DATA);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
-  const [pfiHistory, setPfiHistory] = useState([]);
 
-  // 1) Auth session: check existing session + listen for changes
+  // PFI history state
+  const [pfiHistory, setPfiHistory] = useState([]);
+  const [isSavingCheckpoint, setIsSavingCheckpoint] = useState(false);
+
+  // -------------------
+  // Auth: session + listener
+  // -------------------
   useEffect(() => {
     let cancelled = false;
 
@@ -96,15 +103,51 @@ function App() {
   async function handleLogout() {
     try {
       await supabase.auth.signOut();
-      setHasStarted(false);
       setData(INITIAL_DATA);
+      setHasStarted(false);
       setPfiHistory([]);
     } catch (err) {
       console.error("Error logging out", err);
     }
   }
 
-  // 2) Save current profile to Supabase
+  // -------------------
+  // Profile: load from Supabase when user logs in
+  // -------------------
+  useEffect(() => {
+    if (!user) {
+      setData(INITIAL_DATA);
+      setHasStarted(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadProfile() {
+      setIsProfileLoading(true);
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("data")
+        .eq("id", user.id)
+        .single();
+
+      if (!cancelled) {
+        if (!error && profile?.data) {
+          setData(profile.data);
+          setHasStarted(true);
+        }
+        setIsProfileLoading(false);
+      }
+    }
+
+    loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  // Save profile helper
   async function saveProfileToSupabase(currentData) {
     if (!user) return;
 
@@ -121,65 +164,21 @@ function App() {
     }
   }
 
-  // 3) Load profile whenever user changes (login)
-  useEffect(() => {
-    if (!user) {
-      setData(INITIAL_DATA);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadProfile() {
-      setIsProfileLoading(true);
-
-      const { data: rows, error } = await supabase
-        .from("profiles")
-        .select("data")
-        .eq("id", user.id)
-        .limit(1);
-
-      if (cancelled) return;
-
-      if (error) {
-        console.error("Error loading profile", error);
-        setIsProfileLoading(false);
-        return;
-      }
-
-      if (rows && rows.length > 0 && rows[0].data) {
-        // Existing user: merge saved data with defaults
-        setData({ ...INITIAL_DATA, ...rows[0].data });
-        setHasStarted(true); // they already had a profile once
-      } else {
-        // First-time user: create default row
-        await saveProfileToSupabase(INITIAL_DATA);
-        setData(INITIAL_DATA);
-      }
-
-      setIsProfileLoading(false);
-    }
-
-    loadProfile();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
-
-  // 4) Auto-save profile when data changes
+  // Auto-save profile when data changes (debounced)
   useEffect(() => {
     if (!user) return;
-    if (isProfileLoading) return; // don’t save while loading
+    if (isProfileLoading) return;
 
-    const timeout = setTimeout(() => {
+    const timer = setTimeout(() => {
       saveProfileToSupabase(data);
-    }, 1200); // save 1.2s after last change
+    }, 1200); // 1.2s debounce
 
-    return () => clearTimeout(timeout);
-  }, [data, user, isProfileLoading]);
+    return () => clearTimeout(timer);
+  }, [user, data, isProfileLoading]);
 
-  // 5) Load PFI history for this user
+  // -------------------
+  // PFI history: load from Supabase
+  // -------------------
   useEffect(() => {
     if (!user) {
       setPfiHistory([]);
@@ -190,25 +189,19 @@ function App() {
 
     async function loadHistory() {
       const { data: rows, error } = await supabase
-        .from("portfolio_history")
-        .select("id, created_at, pfi")
+        .from("pfi_history")
+        .select("id, pfi, score, created_at")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true })
+        .limit(60);
 
-      if (cancelled) return;
-
-      if (error) {
-        console.error("Error loading PFI history", error);
-        return;
+      if (!cancelled) {
+        if (error) {
+          console.error("Error loading PFI history", error);
+        } else {
+          setPfiHistory(rows || []);
+        }
       }
-
-      setPfiHistory(
-        (rows || []).map((row) => ({
-          id: row.id,
-          createdAt: row.created_at,
-          pfi: Number(row.pfi),
-        }))
-      );
     }
 
     loadHistory();
@@ -218,37 +211,49 @@ function App() {
     };
   }, [user]);
 
-  // 6) Save a PFI snapshot to Supabase + update local history
-  async function savePfiSnapshot(pfiValue) {
+  // Save a new PFI checkpoint
+  async function handleSaveCheckpoint(pfiValue) {
     if (!user) return;
+    if (typeof pfiValue !== "number") return;
 
-    const payload = {
-      user_id: user.id,
-      pfi: pfiValue,
-      snapshot: data,
-    };
+    setIsSavingCheckpoint(true);
+    try {
+      const payload = {
+        user_id: user.id,
+        pfi: pfiValue,
+      };
 
-    const { data: rows, error } = await supabase
-      .from("portfolio_history")
-      .insert(payload)
-      .select("id, created_at, pfi")
-      .single();
+      const { data: inserted, error } = await supabase
+        .from("pfi_history")
+        .insert(payload)
+        .select("id, pfi, score, created_at")
+        .single();
 
-    if (error) {
-      console.error("Error saving PFI snapshot", error);
-      return;
+      if (error) {
+        console.error("Error saving PFI checkpoint", error);
+      } else if (inserted) {
+        // Merge into local history so the chart updates immediately
+        setPfiHistory((prev) => [...prev, inserted]);
+      } else {
+        // Fallback: if we didn't get a row back, append a synthetic one
+        setPfiHistory((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID ? crypto.randomUUID() : Date.now(),
+            pfi: pfiValue,
+            score: pfiValue,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      }
+    } finally {
+      setIsSavingCheckpoint(false);
     }
-
-    setPfiHistory((prev) => [
-      ...prev,
-      {
-        id: rows.id,
-        createdAt: rows.created_at,
-        pfi: Number(rows.pfi),
-      },
-    ]);
   }
 
+  // -------------------
+  // Local helpers
+  // -------------------
   function update(partial) {
     setData((prev) => ({ ...prev, ...partial }));
   }
@@ -282,12 +287,13 @@ function App() {
     data.invGold +
     data.invOthers;
 
-  // Flow gating: loading → auth landing → profile onboarding → main dashboard
-
-  if (isAuthLoading || (user && isProfileLoading)) {
+  // -------------------
+  // Flow gating
+  // -------------------
+  if (isAuthLoading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
-        <div className="text-sm text-slate-400">Loading your data…</div>
+        <div className="text-sm text-slate-400">Loading your session…</div>
       </div>
     );
   }
@@ -308,7 +314,9 @@ function App() {
     );
   }
 
-  // Main dashboard (PFI journey)
+  // -------------------
+  // Main dashboard
+  // -------------------
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between bg-slate-950/80 backdrop-blur">
@@ -330,11 +338,6 @@ function App() {
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald-400 mr-1" />
             Live simulator · Updates as you fill details
-            {isProfileLoading && (
-              <span className="ml-2 text-slate-500">
-                Syncing with cloud…
-              </span>
-            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -394,7 +397,8 @@ function App() {
               monthlySavings={monthlySavings}
               totalInvestments={totalInvestments}
               pfiHistory={pfiHistory}
-              onSaveSnapshot={savePfiSnapshot}
+              onSaveCheckpoint={handleSaveCheckpoint}
+              isSavingCheckpoint={isSavingCheckpoint}
             />
           )}
 
