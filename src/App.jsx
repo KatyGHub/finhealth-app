@@ -21,13 +21,11 @@ function App() {
     incomeOther: 0,
     incomeVariable: 0,
 
-    // Fixed expenses (needs)
     fixedRent: 0,
     fixedFood: 0,
     fixedUtilities: 0,
     fixedMedical: 0,
 
-    // Variable expenses (wants)
     varWifi: 0,
     varEntertainment: 0,
     varShopping: 0,
@@ -82,7 +80,6 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      {/* Top bar */}
       <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between bg-slate-950/80 backdrop-blur">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xs font-semibold text-emerald-300">
@@ -104,11 +101,8 @@ function App() {
         </div>
       </header>
 
-      {/* Main layout */}
       <main className="flex-1 flex flex-col md:flex-row">
-        {/* Left: tabs + content */}
         <section className="flex-1 px-4 md:px-8 py-6 space-y-4 overflow-y-auto">
-          {/* Tabs */}
           <nav className="inline-flex rounded-full bg-slate-900/80 border border-slate-800 p-1 text-sm mb-4">
             {TABS.map((tab) => {
               const selected = tab === activeTab;
@@ -135,21 +129,39 @@ function App() {
               update={update}
               fixedTotal={fixedTotal}
               variableTotal={variableTotal}
+              onShowScore={() => setActiveTab("Your Score")}
             />
           )}
-          {activeTab === "Your Score" && <ScorePlaceholder />}
-          {activeTab === "FIRE & SIP" && <FirePlaceholder />}
-          {activeTab === "SWOT & Actions" && <SwotPlaceholder />}
+
+          {activeTab === "Your Score" && (
+            <ScoreTab
+              data={data}
+              fixedTotal={fixedTotal}
+              variableTotal={variableTotal}
+              totalIncome={totalIncome}
+              totalExpenses={totalExpenses}
+              monthlySavings={monthlySavings}
+              totalInvestments={totalInvestments}
+            />
+          )}
+
+          {activeTab === "FIRE & SIP" && (
+            <FirePlaceholder />
+          )}
+
+          {activeTab === "SWOT & Actions" && (
+            <SwotPlaceholder />
+          )}
         </section>
 
-        {/* Right: live summary panel */}
         <aside className="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-800 bg-slate-950/90 px-4 py-5 flex flex-col gap-4">
           <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3">
             <div className="text-xs font-semibold text-slate-300 mb-1">
               Live FinHealth snapshot
             </div>
             <div className="text-xs text-slate-400 mb-3">
-              Cash flow overview. This will drive your score and FIRE plan.
+              Cash flow overview. This will drive your Bharat FinHealth Index
+              and FIRE plan.
             </div>
 
             <div className="space-y-2 text-xs">
@@ -213,10 +225,15 @@ function App() {
   );
 }
 
-/* ---------- Input Details Tab ---------- */
+/* ---------- Input Details Tab (journey) ---------- */
 
-function InputDetailsTab({ data, update, fixedTotal, variableTotal }) {
-  // Refs for auto-scroll
+function InputDetailsTab({
+  data,
+  update,
+  fixedTotal,
+  variableTotal,
+  onShowScore,
+}) {
   const personalRef = useRef(null);
   const incomeRef = useRef(null);
   const expensesRef = useRef(null);
@@ -234,11 +251,10 @@ function InputDetailsTab({ data, update, fixedTotal, variableTotal }) {
     <div className="space-y-5">
       <h1 className="text-xl font-semibold">Input Details</h1>
       <p className="text-sm text-slate-300 max-w-2xl">
-        Enter rough monthly numbers first. You can always refine them later.
-        All amounts are in ₹ per month unless mentioned otherwise.
+        Move left to right like a journey. Start with rough monthly numbers;
+        refine later. All amounts are in ₹ per month unless mentioned otherwise.
       </p>
 
-      {/* Personal section */}
       <Card
         title="You & family"
         description="Basic context to tune recommendations."
@@ -283,7 +299,6 @@ function InputDetailsTab({ data, update, fixedTotal, variableTotal }) {
         </div>
       </Card>
 
-      {/* Income */}
       <Card
         title="Monthly income"
         description="Income for you, spouse and other family members. Add fixed + variable."
@@ -319,7 +334,6 @@ function InputDetailsTab({ data, update, fixedTotal, variableTotal }) {
         </div>
       </Card>
 
-      {/* Expenses */}
       <Card
         title="Monthly expenses"
         description="Split needs vs wants. This drives your savings rate and FIRE number."
@@ -328,7 +342,6 @@ function InputDetailsTab({ data, update, fixedTotal, variableTotal }) {
         nextLabel="Next: EMIs & loans"
       >
         <div className="grid gap-4 md:grid-cols-2">
-          {/* Fixed (needs) */}
           <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4 space-y-3">
             <div className="flex justify-between items-baseline">
               <div>
@@ -361,11 +374,13 @@ function InputDetailsTab({ data, update, fixedTotal, variableTotal }) {
               <QuickAmountField
                 label="Utilities & bills (electricity, gas, phone)"
                 value={data.fixedUtilities}
-                onChange={(fixedUtilities) => update({ fixedUtilities })}
+                onChange={(fixedUtilities) =>
+                  update({ fixedUtilities })
+                }
                 suggestions={[2000, 4000, 6000, 8000]}
               />
               <QuickAmountField
-                label="Medical & insurance premiums (monthly)"
+                label="Medical & premiums (monthly)"
                 value={data.fixedMedical}
                 onChange={(fixedMedical) => update({ fixedMedical })}
                 suggestions={[1000, 2000, 3000, 5000]}
@@ -373,7 +388,6 @@ function InputDetailsTab({ data, update, fixedTotal, variableTotal }) {
             </div>
           </div>
 
-          {/* Variable (wants) */}
           <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4 space-y-3">
             <div className="flex justify-between items-baseline">
               <div>
@@ -402,7 +416,9 @@ function InputDetailsTab({ data, update, fixedTotal, variableTotal }) {
               <QuickAmountField
                 label="Entertainment (movies, outings, hobbies)"
                 value={data.varEntertainment}
-                onChange={(varEntertainment) => update({ varEntertainment })}
+                onChange={(varEntertainment) =>
+                  update({ varEntertainment })
+                }
                 suggestions={[2000, 4000, 6000, 10000]}
               />
               <QuickAmountField
@@ -422,10 +438,9 @@ function InputDetailsTab({ data, update, fixedTotal, variableTotal }) {
         </div>
       </Card>
 
-      {/* EMIs & loans */}
       <Card
         title="EMIs & loans"
-        description="Total EMIs and outstanding loans across home, car, personal, credit cards."
+        description="Home, car, personal loans and credit card EMIs."
         innerRef={emisRef}
         onNext={() => scrollTo(protectionRef)}
         nextLabel="Next: Protection"
@@ -446,7 +461,6 @@ function InputDetailsTab({ data, update, fixedTotal, variableTotal }) {
         </div>
       </Card>
 
-      {/* Protection */}
       <Card
         title="Financial protection"
         description="Emergency fund + health insurance + life / term cover."
@@ -476,7 +490,6 @@ function InputDetailsTab({ data, update, fixedTotal, variableTotal }) {
         </div>
       </Card>
 
-      {/* Investments */}
       <Card
         title="Investments (current value)"
         description="Approximate current value in each bucket."
@@ -514,45 +527,155 @@ function InputDetailsTab({ data, update, fixedTotal, variableTotal }) {
             suggestions={[0, 50000, 200000, 500000]}
           />
         </div>
-      </Card>
-    </div>
-  );
-}
 
-/* ---------- Other tabs (still placeholders) ---------- */
-
-function ScorePlaceholder() {
-  return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Your FinHealth Score</h1>
-      <p className="text-sm text-slate-300 max-w-xl">
-        This section will turn your inputs into a 0–100 FinHealth score,
-        explain why it&apos;s low or high, and show options to improve based on
-        Indian benchmarks.
-      </p>
-
-      <Card title="Score, savings meter & breakdown">
-        <div className="h-32 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
-          Next step: score gauge, savings meter and detailed breakdown.
+        <div className="pt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={onShowScore}
+            className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400 transition"
+          >
+            Show Bharat FinHealth Index
+            <span className="text-base">→</span>
+          </button>
         </div>
       </Card>
     </div>
   );
 }
 
+/* ---------- Score tab with real index ---------- */
+
+function ScoreTab({
+  data,
+  fixedTotal,
+  variableTotal,
+  totalIncome,
+  totalExpenses,
+  monthlySavings,
+  totalInvestments,
+}) {
+  const result = computeFinHealth(
+    data,
+    fixedTotal,
+    variableTotal,
+    totalIncome,
+    totalExpenses,
+    monthlySavings,
+    totalInvestments
+  );
+
+  const color =
+    result.score >= 80
+      ? "text-emerald-400"
+      : result.score >= 60
+      ? "text-lime-300"
+      : result.score >= 45
+      ? "text-amber-300"
+      : "text-red-400";
+
+  const gaugeBg =
+    result.score >= 80
+      ? "from-emerald-500/60 via-emerald-400/40 to-emerald-500/10"
+      : result.score >= 60
+      ? "from-lime-400/60 via-lime-300/40 to-lime-400/10"
+      : result.score >= 45
+      ? "from-amber-400/60 via-amber-300/40 to-amber-400/10"
+      : "from-red-500/60 via-red-400/40 to-red-500/10";
+
+  return (
+    <div className="space-y-5">
+      <h1 className="text-xl font-semibold">Your Bharat FinHealth Index</h1>
+      <p className="text-sm text-slate-300 max-w-2xl">
+        The Bharat FinHealth Index (BFI) is a 0–100 score built for Indian
+        households. It looks at savings rate, EMI burden, emergency fund,
+        insurance cover and investments.
+      </p>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr),minmax(0,3fr)]">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 flex flex-col items-center justify-center">
+          <div className="relative h-40 w-40 mb-4">
+            <div
+              className={`absolute inset-0 rounded-full bg-gradient-to-tr ${gaugeBg}`}
+            />
+            <div className="absolute inset-3 rounded-full bg-slate-950 border border-slate-800 flex flex-col items-center justify-center">
+              <div className={`text-4xl font-bold ${color}`}>
+                {Math.round(result.score)}
+              </div>
+              <div className="text-xs text-slate-400 mt-1">
+                out of 100 BFI
+              </div>
+            </div>
+          </div>
+
+          <div className={`text-base font-semibold ${color}`}>
+            {result.bandLabel}
+          </div>
+          <div className="text-xs text-slate-400 mt-1 text-center max-w-xs">
+            {result.bandText}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 space-y-4 text-sm">
+          <h2 className="text-sm font-semibold">Why your BFI looks like this</h2>
+          <div className="grid gap-3 md:grid-cols-2 text-xs">
+            <MetricChip
+              label="Savings rate"
+              value={`${Math.round(result.metrics.savingsRate * 100) || 0}%`}
+              comment={result.comments.savings}
+            />
+            <MetricChip
+              label="EMI burden"
+              value={`${Math.round(result.metrics.emiRatio * 100) || 0}% of income`}
+              comment={result.comments.emi}
+            />
+            <MetricChip
+              label="Emergency fund"
+              value={`${result.metrics.efMonths.toFixed(1)} months`}
+              comment={result.comments.ef}
+            />
+            <MetricChip
+              label="Protection cover"
+              value={`Health: ${result.metrics.healthAdequacy}% · Life: ${result.metrics.lifeAdequacy}%`}
+              comment={result.comments.protection}
+            />
+            <MetricChip
+              label="Investments vs target"
+              value={`${result.metrics.invCoverage}% of long-term target`}
+              comment={result.comments.investments}
+            />
+          </div>
+
+          <div className="pt-2">
+            <h3 className="text-sm font-semibold mb-2">
+              Priority actions to improve your BFI
+            </h3>
+            <ul className="list-disc list-inside text-xs text-slate-300 space-y-1">
+              {result.actions.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- FIRE / SWOT placeholders (for later) ---------- */
+
 function FirePlaceholder() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">FIRE & SIP Planning</h1>
       <p className="text-sm text-slate-300 max-w-xl">
-        Here we&apos;ll calculate your FIRE number, show Lean / Normal / Fat
-        FIRE options and recommend SIP / lumpsum strategies using Indian equity
-        MF return assumptions.
+        Next step: calculate your FIRE number, show Lean / Normal / Fat FIRE
+        options and suggest SIP / lumpsum strategies using Indian equity MF
+        assumptions.
       </p>
 
       <Card title="FIRE number & SIP suggestions">
         <div className="h-32 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
-          Next step: FIRE corpus cards + SIP / lumpsum calculator.
+          Coming soon: FIRE corpus cards + SIP / lumpsum calculator.
         </div>
       </Card>
     </div>
@@ -564,29 +687,29 @@ function SwotPlaceholder() {
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">SWOT & Action Plan</h1>
       <p className="text-sm text-slate-300 max-w-xl">
-        We&apos;ll map your numbers into Strengths, Weaknesses, Opportunities
-        and Threats, and then list concrete action items.
+        Later we&apos;ll convert your numbers into Strengths, Weaknesses,
+        Opportunities and Threats with a short action list.
       </p>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card title="Strengths">
           <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
-            Later: auto-generated strengths (e.g., good savings rate, solid EF).
+            Example: high savings rate, low EMI burden, solid EF.
           </div>
         </Card>
         <Card title="Weaknesses">
           <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
-            Later: weaknesses like low cover, high EMIs, overspending.
+            Example: underinsurance, no EF, overreliance on one asset.
           </div>
         </Card>
         <Card title="Opportunities">
           <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
-            Later: opportunities like higher SIPs, better allocation, tax hacks.
+            Example: increase SIP, tax optimisation, better allocation.
           </div>
         </Card>
         <Card title="Threats">
           <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
-            Later: threats like job loss + EMI load, health risks, underinsurance.
+            Example: job loss with high EMIs, medical risk, liquidity crunch.
           </div>
         </Card>
       </div>
@@ -594,9 +717,216 @@ function SwotPlaceholder() {
   );
 }
 
-/* ---------- Shared UI helpers ---------- */
+/* ---------- Scoring logic ---------- */
 
-function Card({ title, description, children, innerRef, onNext, nextLabel }) {
+function computeFinHealth(
+  data,
+  fixedTotal,
+  variableTotal,
+  totalIncome,
+  totalExpenses,
+  monthlySavings,
+  totalInvestments
+) {
+  const savingsRate =
+    totalIncome > 0 ? monthlySavings / totalIncome : 0;
+
+  const emiRatio =
+    totalIncome > 0 ? data.totalEmi / totalIncome : 0;
+
+  const efMonths =
+    totalExpenses > 0 ? data.emergencyFund / totalExpenses : 0;
+
+  const healthTarget = 500000; // base 5L recommendation
+  const healthAdequacy =
+    healthTarget > 0
+      ? Math.round(
+          Math.min((data.healthCover / healthTarget) * 100, 200)
+        )
+      : 0;
+
+  const annualIncome = totalIncome * 12;
+  const lifeTarget = annualIncome * 15; // 15x annual income
+  const lifeAdequacy =
+    lifeTarget > 0
+      ? Math.round(
+          Math.min((data.lifeCover / lifeTarget) * 100, 200)
+        )
+      : 0;
+
+  const annualExpenses = totalExpenses * 12;
+  const invTarget = annualExpenses * 10; // 10 years of expenses
+  const invCoverage =
+    invTarget > 0
+      ? Math.round(
+          Math.min((totalInvestments / invTarget) * 100, 200)
+        )
+      : 0;
+
+  // Savings score (0–30)
+  let savingsScore = 0;
+  if (savingsRate >= 0.3) savingsScore = 30;
+  else if (savingsRate >= 0.2) savingsScore = 24;
+  else if (savingsRate >= 0.15) savingsScore = 18;
+  else if (savingsRate >= 0.1) savingsScore = 10;
+  else if (savingsRate > 0) savingsScore = 5;
+
+  // EMI score (0–20) – lower EMI% is better
+  let emiScore = 0;
+  if (emiRatio < 0.2) emiScore = 20;
+  else if (emiRatio < 0.3) emiScore = 15;
+  else if (emiRatio < 0.4) emiScore = 10;
+  else if (emiRatio < 0.6) emiScore = 5;
+
+  // Emergency fund (0–20)
+  let efScore = 0;
+  if (efMonths >= 6) efScore = 20;
+  else if (efMonths >= 3) efScore = 14;
+  else if (efMonths >= 1) efScore = 8;
+  else if (efMonths > 0) efScore = 4;
+
+  // Protection (0–20) – 10 for health, 10 for life
+  let healthScore = 0;
+  if (healthAdequacy >= 150) healthScore = 10;
+  else if (healthAdequacy >= 100) healthScore = 8;
+  else if (healthAdequacy >= 60) healthScore = 5;
+  else if (healthAdequacy > 0) healthScore = 2;
+
+  let lifeScore = 0;
+  if (lifeAdequacy >= 100) lifeScore = 10;
+  else if (lifeAdequacy >= 60) lifeScore = 7;
+  else if (lifeAdequacy >= 30) lifeScore = 4;
+  else if (lifeAdequacy > 0) lifeScore = 1;
+
+  const protectionScore = healthScore + lifeScore; // 0–20
+
+  // Investments (0–10)
+  let invScore = 0;
+  if (invCoverage >= 100) invScore = 10;
+  else if (invCoverage >= 60) invScore = 7;
+  else if (invCoverage >= 30) invScore = 4;
+  else if (invCoverage > 0) invScore = 2;
+
+  const score =
+    savingsScore + emiScore + efScore + protectionScore + invScore;
+
+  let bandLabel = "Critical";
+  let bandText =
+    "Very fragile position. Focus on basics: emergency fund, debt control and minimum insurance.";
+  if (score >= 85) {
+    bandLabel = "Financially strong";
+    bandText =
+      "Excellent overall health. You can focus on optimising returns and FIRE timelines.";
+  } else if (score >= 70) {
+    bandLabel = "Secure";
+    bandText =
+      "Solid foundation. Some tuning of cover, savings and investments can push you to the next level.";
+  } else if (score >= 55) {
+    bandLabel = "Stable but exposed";
+    bandText =
+      "You are managing, but risks exist. Prioritise emergency fund, debt load and cover gaps.";
+  } else if (score >= 30) {
+    bandLabel = "Vulnerable";
+    bandText =
+      "A few shocks (job loss, medical issue) can hurt badly. Move quickly on protection and savings.";
+  }
+
+  const comments = {
+    savings:
+      savingsRate >= 0.2
+        ? "Healthy savings rate. Try to sustain 20–30% over many years."
+        : savingsRate > 0.1
+        ? "Okay but thin. Aim to push savings to at least 20% of income."
+        : "Very low savings. Cut wants and increase income to free up at least 15–20% of income.",
+    emi:
+      emiRatio < 0.2
+        ? "EMI load is comfortable."
+        : emiRatio < 0.35
+        ? "EMIs are noticeable but manageable. Avoid new loans."
+        : "High EMI burden. Prioritise prepayment / consolidation and avoid fresh EMIs.",
+    ef:
+      efMonths >= 6
+        ? "Strong emergency buffer in place."
+        : efMonths >= 3
+        ? "Decent buffer. Push towards 6 months of expenses."
+        : efMonths > 0
+        ? "Some buffer, but fragile. Build towards at least 3 months."
+        : "No emergency fund. This is the first priority.",
+    protection:
+      healthAdequacy >= 100 && lifeAdequacy >= 60
+        ? "Protection looks broadly adequate; review cover every 2–3 years."
+        : "Cover looks light. Aim for 5–10L health cover and ~15x annual income in term insurance.",
+    investments:
+      invCoverage >= 60
+        ? "Investments are compounding well. Stay disciplined with equity MFs for long-term goals."
+        : "Investments are behind where they should be. Consider SIPs into diversified equity MFs.",
+  };
+
+  const actions = [];
+
+  if (savingsRate < 0.2) {
+    actions.push(
+      "Target at least 20% savings rate by trimming variable spends and/or increasing income."
+    );
+  }
+  if (emiRatio > 0.3) {
+    actions.push(
+      "Plan a debt strategy: prepay high-interest loans and avoid new EMIs until EMI/income falls below 25%."
+    );
+  }
+  if (efMonths < 3) {
+    actions.push(
+      "Build an emergency fund of at least 3–6 months of expenses in liquid assets (savings, FDs, liquid MFs)."
+    );
+  }
+  if (healthAdequacy < 100) {
+    actions.push(
+      "Upgrade family health insurance to at least ₹5–10L cover, especially if you are in a metro."
+    );
+  }
+  if (lifeAdequacy < 60) {
+    actions.push(
+      "Increase term life cover towards ~15x annual income, especially if dependents rely on your income."
+    );
+  }
+  if (invCoverage < 60) {
+    actions.push(
+      "Start or increase SIPs into diversified equity mutual funds to gradually reach your long-term corpus."
+    );
+  }
+  if (actions.length === 0) {
+    actions.push(
+      "Maintain your current discipline; review cover, EMIs and asset allocation annually."
+    );
+  }
+
+  return {
+    score,
+    bandLabel,
+    bandText,
+    metrics: {
+      savingsRate,
+      emiRatio,
+      efMonths,
+      healthAdequacy,
+      lifeAdequacy,
+      invCoverage,
+    },
+    comments,
+    actions,
+  };
+}
+
+/* ---------- UI helpers ---------- */
+
+function Card({
+  title,
+  description,
+  children,
+  innerRef,
+  onNext,
+  nextLabel,
+}) {
   return (
     <div
       ref={innerRef}
@@ -695,6 +1025,22 @@ function SummaryRow({ label, value }) {
     <div className="flex justify-between text-xs">
       <span className="text-slate-400">{label}</span>
       <span className="text-slate-100 font-medium">{value}</span>
+    </div>
+  );
+}
+
+function MetricChip({ label, value, comment }) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3 space-y-1">
+      <div className="flex justify-between items-baseline">
+        <span className="text-[11px] font-semibold text-slate-200">
+          {label}
+        </span>
+        <span className="text-[11px] text-emerald-300 font-medium">
+          {value}
+        </span>
+      </div>
+      <p className="text-[11px] text-slate-400">{comment}</p>
     </div>
   );
 }
