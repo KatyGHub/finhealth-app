@@ -146,7 +146,12 @@ function App() {
           )}
 
           {activeTab === "FIRE & SIP" && (
-            <FirePlaceholder />
+            <FireTab
+              data={data}
+              totalExpenses={totalExpenses}
+              totalInvestments={totalInvestments}
+              monthlySavings={monthlySavings}
+            />
           )}
 
           {activeTab === "SWOT & Actions" && (
@@ -160,7 +165,7 @@ function App() {
               Live FinHealth snapshot
             </div>
             <div className="text-xs text-slate-400 mb-3">
-              Cash flow overview. This will drive your Bharat FinHealth Index
+              Cash flow overview. This will drive your Portfolio FinHealth Index
               and FIRE plan.
             </div>
 
@@ -534,7 +539,7 @@ function InputDetailsTab({
             onClick={onShowScore}
             className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400 transition"
           >
-            Show Bharat FinHealth Index
+            Show Portfolio FinHealth Index
             <span className="text-base">→</span>
           </button>
         </div>
@@ -584,9 +589,9 @@ function ScoreTab({
 
   return (
     <div className="space-y-5">
-      <h1 className="text-xl font-semibold">Your Bharat FinHealth Index</h1>
+      <h1 className="text-xl font-semibold">Your Portfolio FinHealth Index</h1>
       <p className="text-sm text-slate-300 max-w-2xl">
-        The Bharat FinHealth Index (BFI) is a 0–100 score built for Indian
+        The Portfolio FinHealth Index (PFI) is a 0–100 score built for Indian
         households. It looks at savings rate, EMI burden, emergency fund,
         insurance cover and investments.
       </p>
@@ -661,23 +666,242 @@ function ScoreTab({
   );
 }
 
-/* ---------- FIRE / SWOT placeholders (for later) ---------- */
+/* ---------- FIRE / SWOT sections ---------- */
 
-function FirePlaceholder() {
+function FireTab({ data, totalExpenses, totalInvestments, monthlySavings }) {
+  const [returnRate, setReturnRate] = useState(12); // 10–14% typical equity MF range in India
+
+  const age = data.age || 30;
+  const annualExpenses = totalExpenses * 12;
+
+  // If user hasn't filled expenses yet, show a gentle nudge
+  if (!annualExpenses) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-semibold">FIRE & SIP Planning</h1>
+        <p className="text-sm text-slate-300 max-w-xl">
+          To calculate your FIRE number, we need your monthly expenses first.
+          Go back to Input Details and add fixed + variable spends.
+        </p>
+
+        <Card title="What you&apos;ll see here">
+          <ul className="list-disc list-inside text-xs text-slate-300 space-y-1">
+            <li>Lean, Normal and Fat FIRE corpus based on your expenses</li>
+            <li>Time to FIRE and age at FIRE</li>
+            <li>Required monthly SIP and one-time lumpsum to reach each target</li>
+          </ul>
+        </Card>
+      </div>
+    );
+  }
+
+  // Years you’ll keep investing (target: 60; minimum: 5)
+  const yearsToFireBase = Math.max(5, 60 - age);
+  const rYear = returnRate / 100;
+  const rMonth = rYear / 12;
+  const nMonths = yearsToFireBase * 12;
+
+  const plans = [
+    {
+      id: "lean",
+      label: "Lean FIRE",
+      multiple: 20,
+      tag: "20x annual expenses – minimalist lifestyle",
+    },
+    {
+      id: "normal",
+      label: "Normal FIRE",
+      multiple: 25,
+      tag: "25x annual expenses – standard 4% withdrawal rate",
+    },
+    {
+      id: "fat",
+      label: "Fat FIRE",
+      multiple: 40,
+      tag: "40x annual expenses – more travel, upgrades and buffer",
+    },
+  ];
+
+  const makePlanStats = (plan) => {
+    const targetCorpus = annualExpenses * plan.multiple;
+    const achievedPct = targetCorpus
+      ? Math.min((totalInvestments / targetCorpus) * 100, 100)
+      : 0;
+    const gap = Math.max(targetCorpus - totalInvestments, 0);
+
+    let requiredSip = 0;
+    if (gap > 0 && nMonths > 0) {
+      if (rMonth > 0) {
+        const factor = Math.pow(1 + rMonth, nMonths) - 1;
+        requiredSip = (gap * rMonth) / factor;
+      } else {
+        requiredSip = gap / nMonths;
+      }
+    }
+
+    let requiredLumpsum = 0;
+    if (gap > 0) {
+      requiredLumpsum = gap / Math.pow(1 + rYear, yearsToFireBase);
+    }
+
+    const canRetireNow = gap <= 0;
+
+    return {
+      targetCorpus,
+      achievedPct,
+      gap,
+      requiredSip,
+      requiredLumpsum,
+      canRetireNow,
+    };
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <h1 className="text-xl font-semibold">FIRE & SIP Planning</h1>
-      <p className="text-sm text-slate-300 max-w-xl">
-        Next step: calculate your FIRE number, show Lean / Normal / Fat FIRE
-        options and suggest SIP / lumpsum strategies using Indian equity MF
-        assumptions.
+      <p className="text-sm text-slate-300 max-w-2xl">
+        Based on your current expenses and investments, we estimate how big a
+        corpus you need for Lean / Normal / Fat FIRE. We assume long-term
+        equity mutual fund returns of{" "}
+        <span className="font-semibold">{returnRate}% p.a.</span> (pre-tax).
       </p>
 
-      <Card title="FIRE number & SIP suggestions">
-        <div className="h-32 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
-          Coming soon: FIRE corpus cards + SIP / lumpsum calculator.
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-slate-400">Expected return (p.a.)</span>
+          <div className="inline-flex rounded-full bg-slate-900 border border-slate-700 p-1">
+            {[10, 12, 14].map((rate) => {
+              const selected = rate === returnRate;
+              return (
+                <button
+                  key={rate}
+                  type="button"
+                  onClick={() => setReturnRate(rate)}
+                  className={
+                    "px-3 py-1 rounded-full transition " +
+                    (selected
+                      ? "bg-emerald-500 text-slate-950 font-semibold"
+                      : "text-slate-200 hover:bg-slate-800")
+                  }
+                >
+                  {rate}%
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </Card>
+        <div className="text-slate-400">
+          Current monthly savings:{" "}
+          <span className="text-slate-100 font-medium">
+            {formatCurrency(monthlySavings)}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        {plans.map((plan) => {
+          const stats = makePlanStats(plan);
+          const yearsToFire = yearsToFireBase;
+          const ageAtFire = age + yearsToFire;
+
+          return (
+            <div
+              key={plan.id}
+              className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-3 flex flex-col justify-between"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">
+                      {plan.label}
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      {plan.tag}
+                    </div>
+                  </div>
+                  <div className="text-xs rounded-full border border-slate-700 px-2 py-0.5 text-slate-300">
+                    Target corpus
+                  </div>
+                </div>
+                <div className="text-lg font-semibold text-emerald-300">
+                  {formatCurrency(stats.targetCorpus)}
+                </div>
+
+                <div className="space-y-1 text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Progress</span>
+                    <span className="text-slate-200">
+                      {Math.round(stats.achievedPct)}% achieved
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500"
+                      style={{
+                        width: `${stats.achievedPct}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {!stats.canRetireNow && (
+                  <div className="grid grid-cols-2 gap-2 text-[11px] mt-2">
+                    <div className="rounded-xl bg-slate-950/70 border border-slate-800 p-2">
+                      <div className="text-slate-400">Time to FIRE</div>
+                      <div className="text-slate-100 font-semibold">
+                        {yearsToFire} years
+                      </div>
+                      <div className="text-slate-500">
+                        Age at FIRE: {Math.round(ageAtFire)} yrs
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-slate-950/70 border border-slate-800 p-2">
+                      <div className="text-slate-400">
+                        Required monthly SIP
+                      </div>
+                      <div className="text-slate-100 font-semibold">
+                        {stats.requiredSip
+                          ? formatCurrency(stats.requiredSip)
+                          : "₹0"}
+                      </div>
+                      <div className="text-slate-500">
+                        At {returnRate}% p.a. till age ~60
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {stats.canRetireNow && (
+                  <div className="mt-2 rounded-xl bg-emerald-500/10 border border-emerald-500/40 p-2 text-[11px] text-emerald-200">
+                    Your current investments already meet this FIRE target on
+                    paper. Double-check lifestyle assumptions and taxes before
+                    quitting your job.
+                  </div>
+                )}
+              </div>
+
+              {!stats.canRetireNow && (
+                <div className="pt-2 border-t border-slate-800 mt-2 text-[11px] space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">
+                      If investing as lumpsum today
+                    </span>
+                    <span className="text-slate-100 font-semibold">
+                      {stats.requiredLumpsum
+                        ? formatCurrency(stats.requiredLumpsum)
+                        : "₹0"}
+                    </span>
+                  </div>
+                  <div className="text-slate-500">
+                    Invest this amount now at {returnRate}% p.a. to reach the
+                    target by age ~60 (ignoring future tax changes).
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
