@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { supabase } from "./lib/supabaseClient";
 
 const TABS = [
   "Input Details",
@@ -9,6 +10,9 @@ const TABS = [
 
 function App() {
   const [activeTab, setActiveTab] = useState("Input Details");
+
+  const [user, setUser] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   const [data, setData] = useState({
     age: 30,
@@ -44,6 +48,52 @@ function App() {
     invGold: 0,
     invOthers: 0,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSession() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!cancelled) {
+        setUser(session?.user ?? null);
+        setIsAuthLoading(false);
+      }
+    }
+
+    loadSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  async function handleLogin() {
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+      });
+    } catch (err) {
+      console.error("Error logging in", err);
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("Error logging out", err);
+    }
+  }
 
   function update(partial) {
     setData((prev) => ({ ...prev, ...partial }));
@@ -95,9 +145,38 @@ function App() {
           </div>
         </div>
 
-        <div className="hidden md:flex items-center gap-2 text-xs text-slate-400">
-          <span className="h-2 w-2 rounded-full bg-emerald-400 mr-1" />
-          Live simulator · Updates as you fill details
+        <div className="hidden md:flex items-center gap-4 text-xs text-slate-400">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 mr-1" />
+            Live simulator · Updates as you fill details
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isAuthLoading ? (
+              <span className="text-slate-500">Checking login…</span>
+            ) : user ? (
+              <>
+                <span className="text-slate-300 max-w-[160px] truncate">
+                  {user.user_metadata?.full_name || user.email}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="rounded-full border border-slate-700 px-3 py-1 text-slate-200 hover:bg-slate-800"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleLogin}
+                className="rounded-full bg-emerald-500 text-slate-950 px-3 py-1 font-semibold hover:bg-emerald-400"
+              >
+                Sign in with Google
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -154,17 +233,18 @@ function App() {
             />
           )}
 
-         {activeTab === "SWOT & Actions" && (
-          <SwotTab
-            data={data}
-            fixedTotal={fixedTotal}
-            variableTotal={variableTotal}
-            totalIncome={totalIncome}
-            totalExpenses={totalExpenses}
-            monthlySavings={monthlySavings}
-            totalInvestments={totalInvestments}
-          />
-        )}
+          {activeTab === "SWOT & Actions" && (
+            <SwotTab
+              data={data}
+              fixedTotal={fixedTotal}
+              variableTotal={variableTotal}
+              totalIncome={totalIncome}
+              totalExpenses={totalExpenses}
+              monthlySavings={monthlySavings}
+              totalInvestments={totalInvestments}
+            />
+          )}
+        </section>
 
         <aside className="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-800 bg-slate-950/90 px-4 py-5 flex flex-col gap-4">
           <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3">
@@ -172,8 +252,8 @@ function App() {
               Live FinHealth snapshot
             </div>
             <div className="text-xs text-slate-400 mb-3">
-              Cash flow overview. This will drive your Portfolio FinHealth Index
-              and FIRE plan.
+              Cash flow overview. This will drive your Portfolio FinHealth
+              Index and FIRE plan.
             </div>
 
             <div className="space-y-2 text-xs">
@@ -227,12 +307,11 @@ function App() {
               value={formatCurrency(totalInvestments)}
             />
             <p className="text-[11px] text-slate-500">
-              Later we&apos;ll show how this tracks against your FIRE target and
-              recommended MF / stocks / gold / bonds mix.
+              Later we&apos;ll show how this tracks against your FIRE target
+              and recommended MF / stocks / gold / bonds mix.
             </p>
           </div>
         </aside>
-      </section>
       </main>
     </div>
   );
@@ -615,7 +694,7 @@ function ScoreTab({
                 {Math.round(result.score)}
               </div>
               <div className="text-xs text-slate-400 mt-1">
-                out of 100 BFI
+                out of 100 PFI
               </div>
             </div>
           </div>
