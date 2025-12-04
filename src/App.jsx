@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 const TABS = [
   "Input Details",
@@ -10,7 +10,6 @@ const TABS = [
 function App() {
   const [activeTab, setActiveTab] = useState("Input Details");
 
-  // Core data model we’ll use later for score/FIRE/SWOT
   const [data, setData] = useState({
     age: 30,
     dependents: 0,
@@ -22,8 +21,17 @@ function App() {
     incomeOther: 0,
     incomeVariable: 0,
 
-    fixedNeeds: 0,
-    variableWants: 0,
+    // Fixed expenses (needs)
+    fixedRent: 0,
+    fixedFood: 0,
+    fixedUtilities: 0,
+    fixedMedical: 0,
+
+    // Variable expenses (wants)
+    varWifi: 0,
+    varEntertainment: 0,
+    varShopping: 0,
+    varMisc: 0,
 
     totalEmi: 0,
     loanOutstanding: 0,
@@ -39,14 +47,29 @@ function App() {
     invOthers: 0,
   });
 
-  // Simple derived numbers for the right sidebar
+  function update(partial) {
+    setData((prev) => ({ ...prev, ...partial }));
+  }
+
   const totalIncome =
     data.incomeSelf +
     data.incomeSpouse +
     data.incomeOther +
     data.incomeVariable;
 
-  const totalExpenses = data.fixedNeeds + data.variableWants;
+  const fixedTotal =
+    data.fixedRent +
+    data.fixedFood +
+    data.fixedUtilities +
+    data.fixedMedical;
+
+  const variableTotal =
+    data.varWifi +
+    data.varEntertainment +
+    data.varShopping +
+    data.varMisc;
+
+  const totalExpenses = fixedTotal + variableTotal;
   const monthlySavings = Math.max(totalIncome - totalExpenses, 0);
   const savingsRate = totalIncome > 0 ? monthlySavings / totalIncome : 0;
 
@@ -57,29 +80,25 @@ function App() {
     data.invGold +
     data.invOthers;
 
-  function update(partial) {
-    setData((prev) => ({ ...prev, ...partial }));
-  }
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       {/* Top bar */}
       <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between bg-slate-950/80 backdrop-blur">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xs font-semibold text-emerald-300">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xs font-semibold text-emerald-300">
             FH
           </div>
           <div>
-            <div className="text-sm font-semibold tracking-wide">
+            <div className="text-base font-semibold tracking-wide">
               Findependence – Build Wealth. Retire Earlier.
             </div>
-            <div className="text-[11px] text-slate-400">
+            <div className="text-xs text-slate-400">
               FinHealth – Indian Portfolio &amp; FIRE Coach
             </div>
           </div>
         </div>
 
-        <div className="hidden md:flex items-center gap-2 text-[11px] text-slate-400">
+        <div className="hidden md:flex items-center gap-2 text-xs text-slate-400">
           <span className="h-2 w-2 rounded-full bg-emerald-400 mr-1" />
           Live simulator · Updates as you fill details
         </div>
@@ -88,9 +107,9 @@ function App() {
       {/* Main layout */}
       <main className="flex-1 flex flex-col md:flex-row">
         {/* Left: tabs + content */}
-        <section className="flex-1 px-4 md:px-8 py-6 space-y-4">
+        <section className="flex-1 px-4 md:px-8 py-6 space-y-4 overflow-y-auto">
           {/* Tabs */}
-          <nav className="inline-flex rounded-full bg-slate-900/80 border border-slate-800 p-1 text-xs mb-4">
+          <nav className="inline-flex rounded-full bg-slate-900/80 border border-slate-800 p-1 text-sm mb-4">
             {TABS.map((tab) => {
               const selected = tab === activeTab;
               return (
@@ -111,7 +130,12 @@ function App() {
           </nav>
 
           {activeTab === "Input Details" && (
-            <InputDetailsTab data={data} update={update} />
+            <InputDetailsTab
+              data={data}
+              update={update}
+              fixedTotal={fixedTotal}
+              variableTotal={variableTotal}
+            />
           )}
           {activeTab === "Your Score" && <ScorePlaceholder />}
           {activeTab === "FIRE & SIP" && <FirePlaceholder />}
@@ -124,18 +148,25 @@ function App() {
             <div className="text-xs font-semibold text-slate-300 mb-1">
               Live FinHealth snapshot
             </div>
-            <div className="text-[11px] text-slate-400 mb-3">
-              High-level view of your monthly cash flow. This will later drive
-              your FinHealth score and FIRE plan.
+            <div className="text-xs text-slate-400 mb-3">
+              Cash flow overview. This will drive your score and FIRE plan.
             </div>
 
             <div className="space-y-2 text-xs">
               <SummaryRow
-                label="Total monthly income"
+                label="Total income / month"
                 value={formatCurrency(totalIncome)}
               />
               <SummaryRow
-                label="Total monthly expenses"
+                label="Fixed expenses (needs)"
+                value={formatCurrency(fixedTotal)}
+              />
+              <SummaryRow
+                label="Variable expenses (wants)"
+                value={formatCurrency(variableTotal)}
+              />
+              <SummaryRow
+                label="Total expenses"
                 value={formatCurrency(totalExpenses)}
               />
               <SummaryRow
@@ -145,7 +176,7 @@ function App() {
             </div>
 
             <div className="mt-3">
-              <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+              <div className="flex justify-between text-xs text-slate-400 mb-1">
                 <span>Savings rate</span>
                 <span>{Math.round(savingsRate * 100) || 0}%</span>
               </div>
@@ -157,8 +188,8 @@ function App() {
                   }}
                 />
               </div>
-              <p className="text-[10px] text-slate-500 mt-1">
-                ≥ 20% savings rate is a strong target for most Indian households.
+              <p className="text-[11px] text-slate-500 mt-1">
+                Target ≥ 20% savings rate; 30%+ is excellent for India.
               </p>
             </div>
           </div>
@@ -171,9 +202,9 @@ function App() {
               label="Total investments"
               value={formatCurrency(totalInvestments)}
             />
-            <p className="text-[10px] text-slate-500">
-              We&apos;ll later show how this compares with your FIRE target and
-              recommended asset mix (MF, stocks, gold, bonds, others).
+            <p className="text-[11px] text-slate-500">
+              Later we&apos;ll show how this tracks against your FIRE target and
+              recommended MF / stocks / gold / bonds mix.
             </p>
           </div>
         </aside>
@@ -184,20 +215,40 @@ function App() {
 
 /* ---------- Input Details Tab ---------- */
 
-function InputDetailsTab({ data, update }) {
+function InputDetailsTab({ data, update, fixedTotal, variableTotal }) {
+  // Refs for auto-scroll
+  const personalRef = useRef(null);
+  const incomeRef = useRef(null);
+  const expensesRef = useRef(null);
+  const emisRef = useRef(null);
+  const protectionRef = useRef(null);
+  const investmentsRef = useRef(null);
+
+  const scrollTo = (ref) => {
+    if (ref?.current) {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   return (
-    <div className="space-y-4">
-      <h1 className="text-lg font-semibold">Input Details</h1>
-      <p className="text-sm text-slate-400 max-w-xl">
-        Start with the basics. Keep it simple for now – you can refine numbers
-        later. All amounts are monthly and in ₹.
+    <div className="space-y-5">
+      <h1 className="text-xl font-semibold">Input Details</h1>
+      <p className="text-sm text-slate-300 max-w-2xl">
+        Enter rough monthly numbers first. You can always refine them later.
+        All amounts are in ₹ per month unless mentioned otherwise.
       </p>
 
       {/* Personal section */}
-      <Card title="You & family" description="Basic info to tune recommendations.">
-        <div className="grid gap-3 md:grid-cols-4">
+      <Card
+        title="You & family"
+        description="Basic context to tune recommendations."
+        innerRef={personalRef}
+        onNext={() => scrollTo(incomeRef)}
+        nextLabel="Next: Income"
+      >
+        <div className="grid gap-4 md:grid-cols-4">
           <NumberField
-            label="Age"
+            label="Your age"
             value={data.age}
             onChange={(age) => update({ age })}
           />
@@ -236,6 +287,9 @@ function InputDetailsTab({ data, update }) {
       <Card
         title="Monthly income"
         description="Income for you, spouse and other family members. Add fixed + variable."
+        innerRef={incomeRef}
+        onNext={() => scrollTo(expensesRef)}
+        nextLabel="Next: Expenses"
       >
         <div className="grid gap-4 md:grid-cols-2">
           <QuickAmountField
@@ -268,21 +322,103 @@ function InputDetailsTab({ data, update }) {
       {/* Expenses */}
       <Card
         title="Monthly expenses"
-        description="Split needs vs wants. You can rough-estimate first, then refine."
+        description="Split needs vs wants. This drives your savings rate and FIRE number."
+        innerRef={expensesRef}
+        onNext={() => scrollTo(emisRef)}
+        nextLabel="Next: EMIs & loans"
       >
         <div className="grid gap-4 md:grid-cols-2">
-          <QuickAmountField
-            label="Fixed needs (rent, fees, groceries, transport, bills)"
-            value={data.fixedNeeds}
-            onChange={(fixedNeeds) => update({ fixedNeeds })}
-            suggestions={[20000, 40000, 60000, 80000]}
-          />
-          <QuickAmountField
-            label="Variable wants (shopping, eating out, travel, OTT, misc.)"
-            value={data.variableWants}
-            onChange={(variableWants) => update({ variableWants })}
-            suggestions={[5000, 10000, 20000, 30000]}
-          />
+          {/* Fixed (needs) */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4 space-y-3">
+            <div className="flex justify-between items-baseline">
+              <div>
+                <h3 className="text-sm font-semibold">Fixed expenses (needs)</h3>
+                <p className="text-xs text-slate-400">
+                  Essentials you must pay every month.
+                </p>
+              </div>
+              <div className="text-xs text-slate-300">
+                Total:{" "}
+                <span className="font-semibold">
+                  {formatCurrency(fixedTotal)}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <QuickAmountField
+                label="Rent / home maintenance"
+                value={data.fixedRent}
+                onChange={(fixedRent) => update({ fixedRent })}
+                suggestions={[10000, 20000, 30000, 50000]}
+              />
+              <QuickAmountField
+                label="Food & groceries"
+                value={data.fixedFood}
+                onChange={(fixedFood) => update({ fixedFood })}
+                suggestions={[8000, 15000, 25000, 35000]}
+              />
+              <QuickAmountField
+                label="Utilities & bills (electricity, gas, phone)"
+                value={data.fixedUtilities}
+                onChange={(fixedUtilities) => update({ fixedUtilities })}
+                suggestions={[2000, 4000, 6000, 8000]}
+              />
+              <QuickAmountField
+                label="Medical & insurance premiums (monthly)"
+                value={data.fixedMedical}
+                onChange={(fixedMedical) => update({ fixedMedical })}
+                suggestions={[1000, 2000, 3000, 5000]}
+              />
+            </div>
+          </div>
+
+          {/* Variable (wants) */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4 space-y-3">
+            <div className="flex justify-between items-baseline">
+              <div>
+                <h3 className="text-sm font-semibold">
+                  Variable expenses (wants)
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Lifestyle spends you can flex if needed.
+                </p>
+              </div>
+              <div className="text-xs text-slate-300">
+                Total:{" "}
+                <span className="font-semibold">
+                  {formatCurrency(variableTotal)}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <QuickAmountField
+                label="WiFi / OTT / subscriptions"
+                value={data.varWifi}
+                onChange={(varWifi) => update({ varWifi })}
+                suggestions={[500, 1000, 1500, 2500]}
+              />
+              <QuickAmountField
+                label="Entertainment (movies, outings, hobbies)"
+                value={data.varEntertainment}
+                onChange={(varEntertainment) => update({ varEntertainment })}
+                suggestions={[2000, 4000, 6000, 10000]}
+              />
+              <QuickAmountField
+                label="Shopping (clothes, gadgets, gifts)"
+                value={data.varShopping}
+                onChange={(varShopping) => update({ varShopping })}
+                suggestions={[3000, 5000, 8000, 12000]}
+              />
+              <QuickAmountField
+                label="Misc. / others"
+                value={data.varMisc}
+                onChange={(varMisc) => update({ varMisc })}
+                suggestions={[1000, 3000, 5000, 8000]}
+              />
+            </div>
+          </div>
         </div>
       </Card>
 
@@ -290,6 +426,9 @@ function InputDetailsTab({ data, update }) {
       <Card
         title="EMIs & loans"
         description="Total EMIs and outstanding loans across home, car, personal, credit cards."
+        innerRef={emisRef}
+        onNext={() => scrollTo(protectionRef)}
+        nextLabel="Next: Protection"
       >
         <div className="grid gap-4 md:grid-cols-2">
           <QuickAmountField
@@ -311,6 +450,9 @@ function InputDetailsTab({ data, update }) {
       <Card
         title="Financial protection"
         description="Emergency fund + health insurance + life / term cover."
+        innerRef={protectionRef}
+        onNext={() => scrollTo(investmentsRef)}
+        nextLabel="Next: Investments"
       >
         <div className="grid gap-4 md:grid-cols-3">
           <QuickAmountField
@@ -338,6 +480,7 @@ function InputDetailsTab({ data, update }) {
       <Card
         title="Investments (current value)"
         description="Approximate current value in each bucket."
+        innerRef={investmentsRef}
       >
         <div className="grid gap-4 md:grid-cols-3">
           <QuickAmountField
@@ -376,21 +519,21 @@ function InputDetailsTab({ data, update }) {
   );
 }
 
-/* ---------- Placeholders for other tabs (we’ll fill later) ---------- */
+/* ---------- Other tabs (still placeholders) ---------- */
 
 function ScorePlaceholder() {
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold">Your FinHealth Score</h1>
-      <p className="text-sm text-slate-400 max-w-xl">
+      <h1 className="text-xl font-semibold">Your FinHealth Score</h1>
+      <p className="text-sm text-slate-300 max-w-xl">
         This section will turn your inputs into a 0–100 FinHealth score,
-        explain why it&apos;s low or high (savings, EMIs, protection, assets),
-        and show options to improve.
+        explain why it&apos;s low or high, and show options to improve based on
+        Indian benchmarks.
       </p>
 
       <Card title="Score, savings meter & breakdown">
-        <div className="h-32 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-[11px] text-slate-500">
-          Next step: gauge, savings meter and detailed breakdown based on your data.
+        <div className="h-32 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
+          Next step: score gauge, savings meter and detailed breakdown.
         </div>
       </Card>
     </div>
@@ -400,15 +543,15 @@ function ScorePlaceholder() {
 function FirePlaceholder() {
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold">FIRE & SIP Planning</h1>
-      <p className="text-sm text-slate-400 max-w-xl">
+      <h1 className="text-xl font-semibold">FIRE & SIP Planning</h1>
+      <p className="text-sm text-slate-300 max-w-xl">
         Here we&apos;ll calculate your FIRE number, show Lean / Normal / Fat
         FIRE options and recommend SIP / lumpsum strategies using Indian equity
         MF return assumptions.
       </p>
 
       <Card title="FIRE number & SIP suggestions">
-        <div className="h-32 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-[11px] text-slate-500">
+        <div className="h-32 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
           Next step: FIRE corpus cards + SIP / lumpsum calculator.
         </div>
       </Card>
@@ -419,30 +562,30 @@ function FirePlaceholder() {
 function SwotPlaceholder() {
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold">SWOT & Action Plan</h1>
-      <p className="text-sm text-slate-400 max-w-xl">
+      <h1 className="text-xl font-semibold">SWOT & Action Plan</h1>
+      <p className="text-sm text-slate-300 max-w-xl">
         We&apos;ll map your numbers into Strengths, Weaknesses, Opportunities
         and Threats, and then list concrete action items.
       </p>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card title="Strengths">
-          <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-[11px] text-slate-500">
+          <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
             Later: auto-generated strengths (e.g., good savings rate, solid EF).
           </div>
         </Card>
         <Card title="Weaknesses">
-          <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-[11px] text-slate-500">
+          <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
             Later: weaknesses like low cover, high EMIs, overspending.
           </div>
         </Card>
         <Card title="Opportunities">
-          <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-[11px] text-slate-500">
+          <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
             Later: opportunities like higher SIPs, better allocation, tax hacks.
           </div>
         </Card>
         <Card title="Threats">
-          <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-[11px] text-slate-500">
+          <div className="h-20 rounded-xl border border-dashed border-slate-700/70 flex items-center justify-center text-xs text-slate-500">
             Later: threats like job loss + EMI load, health risks, underinsurance.
           </div>
         </Card>
@@ -451,29 +594,48 @@ function SwotPlaceholder() {
   );
 }
 
-/* ---------- Small UI helpers ---------- */
+/* ---------- Shared UI helpers ---------- */
 
-function Card({ title, description, children }) {
+function Card({ title, description, children, innerRef, onNext, nextLabel }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-3">
-      <div>
-        <h2 className="text-sm font-semibold">{title}</h2>
-        {description && (
-          <p className="text-xs text-slate-400 mt-1">{description}</p>
-        )}
+    <div
+      ref={innerRef}
+      className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 space-y-3"
+    >
+      <div className="flex justify-between items-start gap-3">
+        <div>
+          <h2 className="text-sm md:text-base font-semibold">{title}</h2>
+          {description && (
+            <p className="text-xs md:text-sm text-slate-400 mt-1">
+              {description}
+            </p>
+          )}
+        </div>
       </div>
       {children}
+      {onNext && (
+        <div className="pt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={onNext}
+            className="inline-flex items-center gap-1 text-xs md:text-sm text-emerald-300 hover:text-emerald-200"
+          >
+            <span>{nextLabel || "Save & continue"}</span>
+            <span className="text-base">↘</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 function NumberField({ label, value, onChange }) {
   return (
-    <div className="flex flex-col gap-1 text-xs">
-      <label className="text-slate-300">{label}</label>
+    <div className="flex flex-col gap-1 text-sm">
+      <label className="text-slate-200">{label}</label>
       <input
         type="number"
-        className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
         value={value}
         min={0}
         onChange={(e) => onChange(Number(e.target.value || 0))}
@@ -484,10 +646,10 @@ function NumberField({ label, value, onChange }) {
 
 function SelectField({ label, value, onChange, options }) {
   return (
-    <div className="flex flex-col gap-1 text-xs">
-      <label className="text-slate-300">{label}</label>
+    <div className="flex flex-col gap-1 text-sm">
+      <label className="text-slate-200">{label}</label>
       <select
-        className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
@@ -503,11 +665,11 @@ function SelectField({ label, value, onChange, options }) {
 
 function QuickAmountField({ label, value, onChange, suggestions }) {
   return (
-    <div className="flex flex-col gap-1 text-xs">
-      <label className="text-slate-300">{label}</label>
+    <div className="flex flex-col gap-1 text-sm">
+      <label className="text-slate-200">{label}</label>
       <input
         type="number"
-        className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
         value={value}
         min={0}
         onChange={(e) => onChange(Number(e.target.value || 0))}
@@ -518,7 +680,7 @@ function QuickAmountField({ label, value, onChange, suggestions }) {
             key={amount}
             type="button"
             onClick={() => onChange(amount)}
-            className="px-3 py-1 rounded-full bg-slate-800 text-[11px] text-slate-100 hover:bg-slate-700"
+            className="px-3 py-1 rounded-full bg-slate-800 text-xs text-slate-100 hover:bg-slate-700"
           >
             ₹{amount.toLocaleString("en-IN")}
           </button>
@@ -530,7 +692,7 @@ function QuickAmountField({ label, value, onChange, suggestions }) {
 
 function SummaryRow({ label, value }) {
   return (
-    <div className="flex justify-between text-[11px]">
+    <div className="flex justify-between text-xs">
       <span className="text-slate-400">{label}</span>
       <span className="text-slate-100 font-medium">{value}</span>
     </div>
