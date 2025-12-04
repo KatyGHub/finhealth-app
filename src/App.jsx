@@ -51,11 +51,11 @@ function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [hasStarted, setHasStarted] = useState(false);
 
-  // Main profile data
+  // Main profile data (inputs)
   const [data, setData] = useState(INITIAL_DATA);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
 
-  // PFI history state
+  // PFI history (for chart)
   const [pfiHistory, setPfiHistory] = useState([]);
   const [isSavingCheckpoint, setIsSavingCheckpoint] = useState(false);
 
@@ -118,6 +118,7 @@ function App() {
     if (!user) {
       setData(INITIAL_DATA);
       setHasStarted(false);
+      setPfiHistory([]);
       return;
     }
 
@@ -133,7 +134,10 @@ function App() {
 
       if (!cancelled) {
         if (!error && profile?.data) {
-          setData(profile.data);
+          // Pull history out of the JSON blob, everything else goes into `data`
+          const { __pfiHistory, ...rest } = profile.data;
+          setData({ ...INITIAL_DATA, ...rest });
+          setPfiHistory(Array.isArray(__pfiHistory) ? __pfiHistory : []);
           setHasStarted(true);
         }
         setIsProfileLoading(false);
@@ -147,13 +151,18 @@ function App() {
     };
   }, [user]);
 
-  // Save profile helper
-  async function saveProfileToSupabase(currentData) {
+  // -------------------
+  // Save profile (+ embedded PFI history) to Supabase
+  // -------------------
+  async function saveProfileToSupabase(currentData, historyOverride) {
     if (!user) return;
 
     const payload = {
       id: user.id,
-      data: currentData,
+      data: {
+        ...currentData,
+        __pfiHistory: historyOverride ?? pfiHistory,
+      },
       updated_at: new Date().toISOString(),
     };
 
@@ -164,7 +173,7 @@ function App() {
     }
   }
 
-  // Auto-save profile when data changes (debounced)
+  // Auto-save when inputs change (uses current pfiHistory)
   useEffect(() => {
     if (!user) return;
     if (isProfileLoading) return;
@@ -174,78 +183,42 @@ function App() {
     }, 1200); // 1.2s debounce
 
     return () => clearTimeout(timer);
-  }, [user, data, isProfileLoading]);
+  }, [user, data, isProfileLoading]); // pfiHistory handled separately
 
   // -------------------
-  // PFI history: load from Supabase
-  // -------------------
-  useEffect(() => {
-    if (!user) {
-      setPfiHistory([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadHistory() {
-      const { data: rows, error } = await supabase
-        .from("pfi_history")
-        .select("id, pfi, score, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true })
-        .limit(60);
-
-      if (!cancelled) {
-        if (error) {
-          console.error("Error loading PFI history", error);
-        } else {
-          setPfiHistory(rows || []);
-        }
-      }
-    }
-
-    loadHistory();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
-
   // Save a new PFI checkpoint
+  // -------------------
   async function handleSaveCheckpoint(pfiValue) {
     if (!user) return;
     if (typeof pfiValue !== "number") return;
 
+    const newPoint = {
+      id: crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`,
+      pfi: pfiValue,
+      created_at: new Date().toISOString(),
+    };
+
+    const updatedHistory = [...pfiHistory, newPoint];
+
+    // Optimistic update so the chart moves immediately
+    setPfiHistory(updatedHistory);
     setIsSavingCheckpoint(true);
+
     try {
-      const payload = {
+      // Best-effort write to dedicated table (optional, safe to fail)
+      await supabase.from("pfi_history").insert({
         user_id: user.id,
         pfi: pfiValue,
-      };
+      });
 
-      const { data: inserted, error } = await supabase
-        .from("pfi_history")
-        .insert(payload)
-        .select("id, pfi, score, created_at")
-        .single();
-
-      if (error) {
-        console.error("Error saving PFI checkpoint", error);
-      } else if (inserted) {
-        // Merge into local history so the chart updates immediately
-        setPfiHistory((prev) => [...prev, inserted]);
-      } else {
-        // Fallback: if we didn't get a row back, append a synthetic one
-        setPfiHistory((prev) => [
-          ...prev,
-          {
-            id: crypto.randomUUID ? crypto.randomUUID() : Date.now(),
-            pfi: pfiValue,
-            score: pfiValue,
-            created_at: new Date().toISOString(),
-          },
-        ]);
-      }
+      // Source of truth: embed history in profile JSON
+      await saveProfileToSupabase(data, updatedHistory);
+    } catch (error) {
+      console.error("Error saving PFI checkpoint", error);
+      // Even if insert fails, still persist history inside profile
+      await saveProfileToSupabase(data, updatedHistory);
     } finally {
       setIsSavingCheckpoint(false);
     }
