@@ -1062,29 +1062,57 @@ function ScoreTab({
 }
 
 function Sparkline({ history }) {
+  if (!history || history.length === 0) return null;
+
+  const values = history.map((h) => h.pfi);
   const points = history.map((h, idx) => ({
     x: idx,
     y: h.pfi,
   }));
 
-  if (points.length === 0) return null;
+  // If there is only one point, duplicate it so we still draw a line
   if (points.length === 1) {
     points.push({ x: 1, y: points[0].y });
+    values.push(points[0].y);
   }
 
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+
+  // Zoom into the actual range so small changes are visible.
+  // Add a bit of padding so the line doesn't stick to the borders.
+  let domainMin = rawMin;
+  let domainMax = rawMax;
+
+  if (domainMax - domainMin < 5) {
+    const pad = (5 - (domainMax - domainMin)) / 2;
+    domainMin = Math.max(0, domainMin - pad);
+    domainMax = Math.min(100, domainMax + pad);
+  }
+
+  const range = domainMax - domainMin || 1;
+
   const maxX = points.length - 1 || 1;
-  const maxY = 100;
   const width = 260;
   const height = 80;
   const padding = 8;
 
+  const toSvgCoords = (p) => {
+    const normX = p.x / maxX;
+    const normY = (p.y - domainMin) / range; // 0…1 within [domainMin, domainMax]
+
+    const x =
+      padding + normX * (width - padding * 2);
+    const y =
+      height -
+      (padding + normY * (height - padding * 2));
+
+    return { x, y };
+  };
+
   const path = points
     .map((p, idx) => {
-      const x =
-        padding + (p.x / maxX) * (width - padding * 2);
-      const y =
-        height -
-        (padding + (p.y / maxY) * (height - padding * 2));
+      const { x, y } = toSvgCoords(p);
       return `${idx === 0 ? "M" : "L"} ${x} ${y}`;
     })
     .join(" ");
@@ -1102,11 +1130,7 @@ function Sparkline({ history }) {
         strokeWidth="1.5"
       />
       {points.map((p, idx) => {
-        const x =
-          padding + (p.x / maxX) * (width - padding * 2);
-        const y =
-          height -
-          (padding + (p.y / maxY) * (height - padding * 2));
+        const { x, y } = toSvgCoords(p);
         return (
           <circle
             key={idx}
