@@ -1364,7 +1364,7 @@ function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
 }
 
 // Minimal PFI history chart – replace your existing PfiHistoryChart with this
-function PfiHistoryChart({ checkpoints }) {
+function PfiHistoryChart({ checkpoints = [] }) {
   if (!checkpoints || checkpoints.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-xs text-slate-500">
@@ -1636,6 +1636,14 @@ function ScoreTab({
 
   // History insights
   const hasHistory = pfiHistory && pfiHistory.length > 0;
+  // Data for chart: oldest → latest, { date, score }
+  const checkpointsForChart = (pfiHistory ?? [])
+    .slice()
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    .map((p) => ({
+      date: p.created_at,
+      score: Math.round(p.pfi),
+    }));
 
   function formatDateLabel(iso) {
     return new Date(iso).toLocaleDateString("en-IN", {
@@ -1825,7 +1833,7 @@ function ScoreTab({
           )}
         </div>
 
-        <PfiHistoryChart history={pfiHistory} />
+        <PfiHistoryChart checkpoints={checkpointsForChart} />
 
         {hasHistory && (
           <div className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-[11px] text-slate-500">
