@@ -188,7 +188,7 @@ function App() {
     // -------------------
   // Save a new PFI checkpoint
   // -------------------
-  
+
   async function handleSaveCheckpoint(pfiValue) {
     if (!user) return;
     if (typeof pfiValue !== "number") return;
@@ -543,6 +543,13 @@ function InputDetailsTab({
   const emiLoad = totalIncome > 0 ? data.totalEmi / totalIncome : 0;
   const emergencyMonths =
     totalExpenses > 0 ? data.emergencyFund / totalExpenses : 0;
+
+  const totalInvestments =
+  (data.invBonds || 0) +
+  (data.invMF || 0) +
+  (data.invStocks || 0) +
+  (data.invGold || 0) +
+  (data.invOthers || 0);  
 
   function savingsLabel() {
     if (savingsRate <= 0.05) return "Very tight – <5% savings";
