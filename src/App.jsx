@@ -1301,88 +1301,130 @@ function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
   );
 }
 
-// Minimal PFI history line chart
+// Tiny, minimal PFI history line chart
 function PfiHistoryChart({ history }) {
   if (!history || history.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 text-xs text-slate-500">
-        No checkpoints yet. Save one from the PFI card above.
+        No checkpoints yet. Save your first PFI checkpoint to see progress.
       </div>
     );
   }
 
-  // Clamp PFI to 0–100 and map to simple SVG coords
-  const yTop = 8;
-  const yBottom = 32;
+  // Normalise data
+  const points = history.map((h, idx) => ({
+    index: idx,
+    value: Math.round(Number(h.pfi) || 0),
+    created_at: h.created_at,
+  }));
 
-  const points = history.map((h, idx) => {
-    const raw = Number(h.pfi) || 0;
-    const pfi = Math.max(0, Math.min(100, raw));
+  const values = points.map((p) => p.value);
+  let minVal = Math.min(...values);
+  let maxVal = Math.max(...values);
 
-    const x =
-      history.length === 1 ? 50 : (idx / (history.length - 1)) * 100;
+  // Avoid completely flat line when all values are same
+  if (minVal === maxVal) {
+    minVal = Math.max(0, minVal - 5);
+    maxVal = Math.min(100, maxVal + 5);
+  }
 
-    const y = yBottom - (pfi / 100) * (yBottom - yTop);
+  const range = maxVal - minVal || 1;
 
-    return {
-      x,
-      y,
-      pfi,
-      created_at: h.created_at,
-    };
-  });
+  const width = 100;
+  const height = 40;
+  const xPadding = 6;
+  const yPadding = 6;
 
-  const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(" ");
+  const last = points[points.length - 1];
 
-  const firstDate = new Date(history[0].created_at).toLocaleDateString(
+  const firstDate = new Date(points[0].created_at).toLocaleDateString(
     "en-IN",
     { day: "2-digit", month: "short", year: "2-digit" }
   );
-  const lastDate = new Date(
-    history[history.length - 1].created_at
-  ).toLocaleDateString("en-IN", {
+  const lastDate = new Date(last.created_at).toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "2-digit",
   });
 
+  const getX = (i) => {
+    if (points.length === 1) return width / 2;
+    const t = i / (points.length - 1);
+    return xPadding + t * (width - xPadding * 2);
+  };
+
+  const getY = (v) => {
+    const norm = (v - minVal) / range; // 0–1
+    return height - (yPadding + norm * (height - yPadding * 2));
+  };
+
+  const svgPoints = points.map((p) => ({
+    ...p,
+    x: getX(p.index),
+    y: getY(p.value),
+  }));
+
+  const pathD = svgPoints
+    .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
+    .join(" ");
+
   return (
-    <div className="w-full">
-      <div className="h-32 w-full">
+    <div className="mt-2">
+      <div className="h-28 md:h-32 w-full">
         <svg
-          viewBox="0 0 100 40"
+          viewBox={`0 0 ${width} ${height}`}
           className="w-full h-full"
           preserveAspectRatio="none"
         >
-          {/* subtle baseline */}
+          {/* subtle horizontal guides */}
           <line
             x1="0"
-            y1={yBottom + 2}
-            x2="100"
-            y2={yBottom + 2}
+            y1={getY(minVal)}
+            x2={width}
+            y2={getY(minVal)}
             stroke="#1e293b"
-            strokeWidth="0.4"
+            strokeWidth="0.3"
+          />
+          <line
+            x1="0"
+            y1={getY(maxVal)}
+            x2={width}
+            y2={getY(maxVal)}
+            stroke="#1e293b"
+            strokeWidth="0.3"
           />
 
-          {/* line */}
-          <polyline
+          {/* main line */}
+          <path
+            d={pathD}
             fill="none"
             stroke="#22c55e"
-            strokeWidth="1.4"
-            points={polylinePoints}
+            strokeWidth="0.9"
+            strokeLinejoin="round"
+            strokeLinecap="round"
           />
 
-          {/* points */}
-          {points.map((p, idx) => (
-            <circle
-              key={idx}
-              cx={p.x}
-              cy={p.y}
-              r="1.8"
-              fill="#22c55e"
-              stroke="#020617"
-              strokeWidth="0.7"
-            />
+          {/* points + tiny labels */}
+          {svgPoints.map((p, idx) => (
+            <g key={idx}>
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r="1.3"
+                fill="#22c55e"
+                stroke="#020617"
+                strokeWidth="0.4"
+              />
+              <text
+                x={p.x}
+                y={p.y - 2.5}
+                fontSize="3"
+                fill="#e2e8f0"
+                textAnchor="middle"
+              >
+                {p.value}
+              </text>
+            </g>
           ))}
         </svg>
       </div>
@@ -1392,8 +1434,7 @@ function PfiHistoryChart({ history }) {
           Oldest: {firstDate} · Latest: {lastDate}
         </span>
         <span>
-          Checkpoints: {history.length} · Latest PFI:{" "}
-          {Math.round(history[history.length - 1].pfi || 0)}
+          Checkpoints: {history.length} · Latest PFI: {last.value}
         </span>
       </div>
     </div>
