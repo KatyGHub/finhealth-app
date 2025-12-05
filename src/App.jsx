@@ -1301,7 +1301,7 @@ function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
   );
 }
 
-// Tiny, minimal PFI history line chart
+// Minimal PFI history line chart with subtle labels
 function PfiHistoryChart({ history }) {
   if (!history || history.length === 0) {
     return (
@@ -1311,7 +1311,6 @@ function PfiHistoryChart({ history }) {
     );
   }
 
-  // Normalise data
   const points = history.map((h, idx) => ({
     index: idx,
     value: Math.round(Number(h.pfi) || 0),
@@ -1322,7 +1321,6 @@ function PfiHistoryChart({ history }) {
   let minVal = Math.min(...values);
   let maxVal = Math.max(...values);
 
-  // Avoid completely flat line when all values are same
   if (minVal === maxVal) {
     minVal = Math.max(0, minVal - 5);
     maxVal = Math.min(100, maxVal + 5);
@@ -1332,8 +1330,8 @@ function PfiHistoryChart({ history }) {
 
   const width = 100;
   const height = 40;
-  const xPadding = 6;
-  const yPadding = 6;
+  const xPadding = 8;
+  const yPadding = 8;
 
   const last = points[points.length - 1];
 
@@ -1354,7 +1352,7 @@ function PfiHistoryChart({ history }) {
   };
 
   const getY = (v) => {
-    const norm = (v - minVal) / range; // 0–1
+    const norm = (v - minVal) / range;
     return height - (yPadding + norm * (height - yPadding * 2));
   };
 
@@ -1368,6 +1366,9 @@ function PfiHistoryChart({ history }) {
     .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
     .join(" ");
 
+  // For many points, show labels on every 2nd point to keep it clean
+  const labelStep = svgPoints.length > 10 ? 2 : 1;
+
   return (
     <div className="mt-2">
       <div className="h-28 md:h-32 w-full">
@@ -1376,22 +1377,13 @@ function PfiHistoryChart({ history }) {
           className="w-full h-full"
           preserveAspectRatio="none"
         >
-          {/* subtle horizontal guides */}
-          <line
-            x1="0"
-            y1={getY(minVal)}
-            x2={width}
-            y2={getY(minVal)}
-            stroke="#1e293b"
-            strokeWidth="0.3"
-          />
-          <line
-            x1="0"
-            y1={getY(maxVal)}
-            x2={width}
-            y2={getY(maxVal)}
-            stroke="#1e293b"
-            strokeWidth="0.3"
+          {/* very subtle band between min and max */}
+          <rect
+            x="0"
+            y={getY(maxVal)}
+            width={width}
+            height={getY(minVal) - getY(maxVal)}
+            fill="rgba(15,23,42,0.5)"
           />
 
           {/* main line */}
@@ -1399,31 +1391,33 @@ function PfiHistoryChart({ history }) {
             d={pathD}
             fill="none"
             stroke="#22c55e"
-            strokeWidth="0.9"
+            strokeWidth="0.8"
             strokeLinejoin="round"
             strokeLinecap="round"
           />
 
-          {/* points + tiny labels */}
+          {/* points + smaller, softer labels */}
           {svgPoints.map((p, idx) => (
             <g key={idx}>
               <circle
                 cx={p.x}
                 cy={p.y}
-                r="1.3"
+                r="1"
                 fill="#22c55e"
                 stroke="#020617"
-                strokeWidth="0.4"
+                strokeWidth="0.35"
               />
-              <text
-                x={p.x}
-                y={p.y - 2.5}
-                fontSize="3"
-                fill="#e2e8f0"
-                textAnchor="middle"
-              >
-                {p.value}
-              </text>
+              {idx % labelStep === 0 && (
+                <text
+                  x={p.x}
+                  y={p.y - 2}
+                  fontSize="2.2"
+                  fill="#cbd5f5"
+                  textAnchor="middle"
+                >
+                  {p.value}
+                </text>
+              )}
             </g>
           ))}
         </svg>
