@@ -1,15 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "./lib/supabaseClient";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-  LabelList,
-} from "recharts";
 
 const INITIAL_DATA = {
   age: 30,
@@ -1303,6 +1293,167 @@ function computePFI({
   };
 }
 
+// Small helper to render each pillar bar
+function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
+  const pct = Math.min((score / maxScore) * 100, 100);
+
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs text-slate-300">
+        <span>{label}</span>
+        <span className="text-slate-400">
+          {score}/{maxScore}
+          {suffix ? ` · ${suffix}` : ""}
+        </span>
+      </div>
+      <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+        <div
+          className="h-full bg-emerald-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {valueText && (
+        <div className="text-[11px] text-slate-400">{valueText}</div>
+      )}
+      {meta && (
+        <div className="text-[11px] text-slate-500">{meta}</div>
+      )}
+    </div>
+  );
+}
+
+// Tiny SVG chart with PFI labels on each point
+function PfiHistoryChart({ history }) {
+  if (!history || history.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-40 text-xs text-slate-500">
+        No checkpoints yet. Save your first PFI checkpoint to see progress.
+      </div>
+    );
+  }
+
+  if (history.length === 1) {
+    const value = Math.round(history[0].pfi);
+    return (
+      <div className="flex flex-col items-center justify-center h-40 text-xs text-slate-500">
+        <div className="mb-2">
+          Only one checkpoint so far. Add a few more to see a proper trend.
+        </div>
+        <div className="flex items-center gap-2 text-emerald-400 text-sm">
+          ● <span>PFI {value}</span>
+        </div>
+      </div>
+    );
+  }
+
+  const values = history.map((h) => Math.round(h.pfi));
+  const minPfi = Math.min(...values);
+  const maxPfi = Math.max(...values);
+  const range = Math.max(maxPfi - minPfi, 10); // avoid perfectly flat line
+
+  const points = history.map((h, idx) => {
+    const pfi = Math.round(h.pfi);
+    const x =
+      history.length === 1 ? 50 : (idx / (history.length - 1)) * 100;
+    const y = 90 - ((pfi - minPfi) / range) * 60; // 30–90 vertical span
+    return { x, y, pfi, created_at: h.created_at };
+  });
+
+  const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(" ");
+
+  const firstDate = new Date(history[0].created_at).toLocaleDateString(
+    "en-IN",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "2-digit",
+    }
+  );
+  const lastDate = new Date(
+    history[history.length - 1].created_at
+  ).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "2-digit",
+  });
+
+  return (
+    <div className="h-40 w-full">
+      <svg
+        viewBox="0 0 100 100"
+        className="w-full h-full"
+        preserveAspectRatio="none"
+      >
+        {/* Background */}
+        <rect x="0" y="0" width="100" height="100" fill="transparent" />
+
+        {/* Line */}
+        <polyline
+          fill="none"
+          stroke="#22c55e"
+          strokeWidth="0.8"
+          points={polylinePoints}
+        />
+
+        {/* Points + numeric labels */}
+        {points.map((p, idx) => (
+          <g key={idx}>
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r="1.4"
+              fill="#22c55e"
+              stroke="#0f172a"
+              strokeWidth="0.4"
+            />
+            <text
+              x={p.x}
+              y={p.y - 3}
+              textAnchor="middle"
+              fontSize="3"
+              fill="#e2e8f0"
+            >
+              {p.pfi}
+            </text>
+          </g>
+        ))}
+
+        {/* Baseline */}
+        <line
+          x1="0"
+          y1="92"
+          x2="100"
+          y2="92"
+          stroke="#1e293b"
+          strokeWidth="0.4"
+        />
+
+        {/* Start / end dates */}
+        <text x="2" y="97" fontSize="2.6" fill="#64748b">
+          {firstDate}
+        </text>
+        <text
+          x="98"
+          y="97"
+          fontSize="2.6"
+          textAnchor="end"
+          fill="#64748b"
+        >
+          {lastDate}
+        </text>
+      </svg>
+
+      <div className="flex justify-between mt-2 text-[11px] text-slate-500">
+        <span>Oldest on the left, latest on the right.</span>
+        <span>
+          Checkpoints: {history.length} · Latest PFI:{" "}
+          {Math.round(history[history.length - 1].pfi)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function ScoreTab({
   data,
   fixedTotal,
@@ -1315,588 +1466,160 @@ function ScoreTab({
   onSaveCheckpoint,
   isSavingCheckpoint,
 }) {
+  // Core metrics
   const savingsRate = totalIncome > 0 ? monthlySavings / totalIncome : 0;
+  const savingsPct = Math.round(savingsRate * 100) || 0;
 
-  const emiLoad =
-    totalIncome > 0 ? (data.totalEmi || 0) / totalIncome : 0;
-
+  const monthlyExpenses = totalExpenses;
   const emergencyMonths =
-    totalExpenses > 0 ? (data.emergencyFund || 0) / totalExpenses : 0;
+    monthlyExpenses > 0 ? data.emergencyFund / monthlyExpenses : 0;
+  const efMonthsRounded = emergencyMonths.toFixed(1);
 
-  const annualExpenses = totalExpenses * 12;
+  const emiRatio = totalIncome > 0 ? data.totalEmi / totalIncome : 0;
+  const emiPct = Math.round(emiRatio * 100) || 0;
+
   const annualIncome = totalIncome * 12;
+  const targetLifeCover = annualIncome * 15; // 15x annual income
+  const actualCover = Math.max(data.lifeCover + data.healthCover, 0);
+  const coverGapPct =
+    targetLifeCover > 0
+      ? Math.max(
+          0,
+          ((targetLifeCover - actualCover) / targetLifeCover) * 100
+        )
+      : 100;
 
-  const lifeCover = data.lifeCover || 0;
-  const healthCover = data.healthCover || 0;
+  // Stricter scoring
+  // Savings: 0–40
+  let savingsScore = 0;
+  if (savingsRate >= 0.3) savingsScore = 40;
+  else if (savingsRate >= 0.2) savingsScore = 30;
+  else if (savingsRate >= 0.1) savingsScore = 15;
+  else if (savingsRate > 0) savingsScore = 5;
 
-  const totalInvestmentsAll = totalInvestments || 0;
-  const investmentsToExpensesRatio =
-    annualExpenses > 0
-      ? totalInvestmentsAll / annualExpenses
-      : 0;
+  // Emergency fund: 0–20
+  let efScore = 0;
+  if (emergencyMonths >= 6) efScore = 20;
+  else if (emergencyMonths >= 3) efScore = 12;
+  else if (emergencyMonths > 0) efScore = 5;
 
-  // Same health band helper as FIRE tab, but local here
-  function getHealthCoverBand(cityTier, age, dependents) {
-    const deps = Number(dependents || 0);
-    const base =
-      cityTier === "metro"
-        ? 1500000
-        : cityTier === "tier2"
-        ? 1000000
-        : 750000;
+  // EMI load (lower is better): 0–20
+  let emiScore = 0;
+  if (emiRatio <= 0.2) emiScore = 20;
+  else if (emiRatio <= 0.3) emiScore = 15;
+  else if (emiRatio <= 0.4) emiScore = 8;
+  else if (emiRatio <= 0.5) emiScore = 3;
 
-    const depFactor = 1 + Math.min(deps, 3) * 0.25;
-    const ageFactor = age >= 45 ? 1.25 : 1;
+  // Protection cover: 0–20 (smaller gap is better)
+  let protectionScore = 0;
+  if (coverGapPct <= 0) protectionScore = 20; // fully covered or more
+  else if (coverGapPct <= 25) protectionScore = 15;
+  else if (coverGapPct <= 50) protectionScore = 8;
+  else if (coverGapPct <= 75) protectionScore = 3;
 
-    const lower = base * depFactor * ageFactor;
-    const upper = lower * 1.5;
-
-    return { lower, upper };
-  }
-
-  const { lower: healthLower } = getHealthCoverBand(
-    data.cityTier || "metro",
-    Number(data.age || 30),
-    data.dependents || 0
+  const pfiScore = Math.round(
+    savingsScore + efScore + emiScore + protectionScore
   );
-
-  // ---------- PFI calculation (stricter) ----------
-  function computePFI() {
-    let score = 0;
-
-    // 1) Savings rate (0–30)
-    // 0% → 0, 20% → ~15, 30% → ~22.5, 40% → ~27, 50%+ → 30
-    const cappedSavingsRate = Math.min(savingsRate, 0.5);
-    const savingsScore = (cappedSavingsRate / 0.5) * 30;
-
-    // 2) Emergency fund (0–20)
-    // 0 months → 0, 3 months → 10, 6 months → 15, 12 months+ → 20
-    const cappedEmergencyMonths = Math.min(emergencyMonths, 12);
-    const emergencyScore = (cappedEmergencyMonths / 12) * 20;
-
-    // 3) EMI load (0–20)
-    // <20% → 20, 20–30% → 12–18, 30–50% → 4–12, >50% → 0
-    let emiScore = 0;
-    if (emiLoad <= 0.2) {
-      emiScore = 20;
-    } else if (emiLoad <= 0.3) {
-      // 20% → 20, 30% → 16
-      emiScore = 20 - ((emiLoad - 0.2) / 0.1) * 4;
-    } else if (emiLoad <= 0.5) {
-      // 30% → 16, 50% → 4
-      emiScore = 16 - ((emiLoad - 0.3) / 0.2) * 12;
-    } else {
-      emiScore = 0;
-    }
-    emiScore = Math.max(0, emiScore);
-
-    // 4) Protection (0–15 life + 0–10 health = 0–25)
-    let lifeScore = 0;
-    if (annualIncome > 0 && lifeCover > 0) {
-      const ratioTo10x = lifeCover / (annualIncome * 10);
-      const cappedRatio = Math.min(ratioTo10x, 1.5);
-      lifeScore = Math.max(0, (cappedRatio / 1.5) * 15);
-    }
-
-    let healthScore = 0;
-    if (healthCover > 0 && healthLower > 0) {
-      const ratio = healthCover / healthLower;
-      const capped = Math.min(ratio, 1.5);
-      healthScore = Math.max(0, (capped / 1.5) * 10);
-    }
-
-    const protectionScore = lifeScore + healthScore;
-
-    // 5) Investments depth (0–25)
-    // 0x → 0, 3x → 15, 5x → 25
-    const cappedInvRatio = Math.min(investmentsToExpensesRatio, 5);
-    const investmentsScore = (cappedInvRatio / 5) * 25;
-
-    score =
-      savingsScore +
-      emergencyScore +
-      emiScore +
-      protectionScore +
-      investmentsScore;
-
-    return Math.max(0, Math.min(100, score));
-  }
-
-  const rawPFI = computePFI();
-  const pfiScore = Math.round(rawPFI * 10) / 10;
-
-  function interpretPFI(score) {
-    if (score < 40) {
-      return {
-        label: "Fragile",
-        color: "text-red-300",
-        summary:
-          "Your finances are quite fragile right now. Focus on reducing high-interest EMIs, building even 1–2 months of emergency fund, and getting basic health + term cover in place.",
-        focusPoints: [
-          "Cut variable spends and redirect a fixed amount to emergency fund each month.",
-          "Close or reduce any high-interest personal / credit card loans first.",
-          "Ensure you have at least one decent health insurance policy and a basic term cover.",
-        ],
-      };
-    }
-    if (score < 60) {
-      return {
-        label: "Building base",
-        color: "text-amber-300",
-        summary:
-          "You’re out of the danger zone, but still building a strong foundation. The next big jumps will come from higher savings rate and a stronger emergency fund.",
-        focusPoints: [
-          "Target a savings rate of at least 20% of your income.",
-          "Push your emergency fund towards 3–6 months of expenses.",
-          "Avoid taking new loans unless absolutely necessary.",
-        ],
-      };
-    }
-    if (score < 80) {
-      return {
-        label: "Getting solid",
-        color: "text-emerald-300",
-        summary:
-          "Your base looks decent. Now focus on compounding: disciplined SIPs, optimised asset allocation, and gradually reducing EMI weight.",
-        focusPoints: [
-          "Stabilise savings at 25–30%+ of income where possible.",
-          "Keep EMIs under ~30% of income over time.",
-          "Scale SIPs into diversified equity funds while maintaining a 6–12 month emergency buffer.",
-        ],
-      };
-    }
-    return {
-      label: "Strong",
-      color: "text-emerald-300",
-      summary:
-        "You’re in a strong position. The main risk now is over-leverage or concentration. Fine-tune your allocation and keep reviewing protection every few years.",
-      focusPoints: [
-        "Check that no single asset / stock dominates your net worth.",
-        "Review health and life cover as income and lifestyle grow.",
-        "Stay invested through cycles; avoid reacting to short-term noise.",
-      ],
-    };
-  }
-
-  const pfiView = interpretPFI(pfiScore);
-
-  // ---------- Save handler from parent ----------
-  function handleSaveClick() {
-    if (!onSaveCheckpoint || isSavingCheckpoint) return;
-    onSaveCheckpoint(pfiScore);
-  }
-
-  // ---------- Chart data from parent history ----------
-  const historyPoints = (pfiHistory || []).map((row, index) => ({
-    id: row.id,
-    label: new Date(row.created_at).toLocaleDateString("en-IN", {
-      month: "short",
-      day: "numeric",
-    }),
-    score: row.score,
-    index,
-  }));
-
-  const chartData =
-    historyPoints.length > 0
-      ? [
-          ...historyPoints,
-          {
-            id: "current",
-            label: "Now",
-            score: pfiScore,
-            index: historyPoints.length,
-          },
-        ]
-      : [
-          {
-            id: "current",
-            label: "Now",
-            score: pfiScore,
-            index: 0,
-          },
-        ];
-
-  // ---------- Micro explanation from last two saved points ----------
-  let microExplanationTitle = "PFI trend insight";
-  let microExplanationBody =
-    "Save your PFI periodically after major financial changes (new loan, salary change, big investment) to see how the score moves over time.";
-
-  let lastSavedText = "";
-
-  if (pfiHistory && pfiHistory.length > 0) {
-    const sorted = [...pfiHistory].sort(
-      (a, b) => new Date(a.created_at) - new Date(b.created_at)
-    );
-    const latest = sorted[sorted.length - 1];
-    const prev = sorted[sorted.length - 2];
-
-    const latestDate = new Date(latest.created_at).toLocaleString("en-IN", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
-
-    lastSavedText = `Last saved PFI: ${latest.score.toFixed(
-      1
-    )} on ${latestDate}`;
-
-    if (prev) {
-      const oldScore = prev.score;
-      const newScore = latest.score;
-      const delta = newScore - oldScore;
-      const absDelta = Math.abs(delta).toFixed(1);
-
-      const oldBucket = interpretPFI(oldScore);
-      const newBucket = interpretPFI(newScore);
-
-      if (delta > 0.1) {
-        microExplanationTitle = "Your PFI has improved";
-        microExplanationBody = `Your saved PFI moved from ${oldScore.toFixed(
-          1
-        )} (${oldBucket.label}) to ${newScore.toFixed(
-          1
-        )} (${newBucket.label}), a +${absDelta} point improvement since the last time you saved. Often this comes from a better savings rate, stronger emergency fund, or improved insurance/investment depth.`;
-      } else if (delta < -0.1) {
-        microExplanationTitle = "Your PFI has slipped a bit";
-        microExplanationBody = `Your saved PFI went from ${oldScore.toFixed(
-          1
-        )} (${oldBucket.label}) to ${newScore.toFixed(
-          1
-        )} (${newBucket.label}), a -${absDelta} point move since the last save. This can happen if EMIs increased, savings dropped, or protection/investments haven’t kept up. Use the Input and FIRE tabs to see which lever you can fix first.`;
-      } else {
-        microExplanationTitle = "PFI is roughly flat";
-        microExplanationBody = `Your saved PFI is almost unchanged (from ${oldScore.toFixed(
-          1
-        )} to ${newScore.toFixed(
-          1
-        )}). That’s okay – most improvement comes in jumps when you pay down loans, increase SIPs, or shore up emergency/insurance.`;
-      }
-    } else {
-      microExplanationTitle = "First PFI snapshot saved";
-      microExplanationBody =
-        "You’ve saved your first PFI snapshot. As you tweak income, expenses, EMIs and protection, save again after changes. We’ll compare the last two saves and explain how your PFI shifted.";
-    }
-  }
 
   return (
     <div className="space-y-6">
-      {/* Top: big PFI card + key levers */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 flex flex-col justify-between">
-          <div className="flex items-baseline justify-between mb-4">
-            <div>
-              <div className="text-xs text-slate-400 mb-1">
-                Portfolio FinHealth Index (PFI)
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-semibold text-slate-50">
-                  {pfiScore.toFixed(1)}
-                </span>
-                <span className="text-xs text-slate-500">/ 100</span>
-              </div>
-            </div>
-            <div className="text-right">
-              <div
-                className={
-                  "text-xs font-semibold " + pfiView.color
-                }
-              >
-                {pfiView.label}
-              </div>
-              <div className="text-[11px] text-slate-500">
-                Based on savings, EMIs, protection and investments
-              </div>
-            </div>
+      {/* Main PFI + pillars */}
+      <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 md:p-6 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-100">
+              Portfolio FinHealth Index (PFI)
+            </h2>
+            <p className="text-xs text-slate-400 mt-1 max-w-xl">
+              Composite score combining savings strength, emergency fund, EMI
+              stress and protection cover – tuned for Indian investors.
+            </p>
           </div>
-          <p className="text-xs md:text-sm text-slate-300 mb-3">
-            {pfiView.summary}
+
+          <button
+            type="button"
+            onClick={() => onSaveCheckpoint(pfiScore)}
+            disabled={isSavingCheckpoint}
+            className="self-start inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isSavingCheckpoint ? (
+              <>
+                <span className="h-3 w-3 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              "Save this PFI checkpoint"
+            )}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-[220px,1fr] gap-6">
+          {/* Score card */}
+          <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 flex flex-col items-center justify-center text-center">
+            <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-2">
+              Current PFI
+            </div>
+            <div className="text-5xl font-semibold text-emerald-400">
+              {pfiScore}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1 mb-3">/ 100</div>
+            <p className="text-[11px] text-slate-400 max-w-[170px]">
+              Higher is better. Focus on improving one pillar at a time.
+            </p>
+          </div>
+
+          {/* Pillars */}
+          <div className="space-y-4">
+            <PillarBar
+              label="Savings strength"
+              score={savingsScore}
+              maxScore={40}
+              suffix={`${savingsPct}%`}
+              valueText={`Aim for 20–30%+ savings rate for aggressive FIRE. You’re at ${savingsPct}%.`}
+            />
+
+            <PillarBar
+              label="Emergency fund"
+              score={efScore}
+              maxScore={20}
+              suffix={`${efMonthsRounded} months`}
+              valueText={`Target 6 months of expenses in liquid funds. You’re at ${efMonthsRounded} months.`}
+            />
+
+            <PillarBar
+              label="EMI load"
+              score={emiScore}
+              maxScore={20}
+              suffix={`${emiPct}%`}
+              valueText={`Keep total EMIs under 30% of take-home. You’re at ${emiPct}%.`}
+            />
+
+            <PillarBar
+              label="Protection cover"
+              score={protectionScore}
+              maxScore={20}
+              suffix={`${Math.round(coverGapPct)}% gap`}
+              valueText="Life cover of ~15× annual income + strong health insurance gives your family robust protection."
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* History section */}
+      <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 md:p-6 space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-100">
+            PFI history
+          </h3>
+          <p className="text-xs text-slate-400 mt-1">
+            Each checkpoint is stored when you click “Save this PFI
+            checkpoint”. This shows how your Portfolio FinHealth Index has
+            moved over time.
           </p>
-          <div className="mt-auto">
-            <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden mb-1">
-              <div
-                className="h-full bg-emerald-500"
-                style={{ width: `${Math.min(pfiScore, 100)}%` }}
-              />
-            </div>
-            <p className="text-[11px] text-slate-500">
-              0–40: Fragile · 40–60: Building base · 60–80: Getting solid ·
-              80–100: Strong
-            </p>
-          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 space-y-3">
-          <div className="text-xs font-semibold text-slate-200 mb-1">
-            Core monthly levers
-          </div>
-          <div className="space-y-2 text-[11px] md:text-xs text-slate-200">
-            <div className="flex justify-between">
-              <span>Savings rate</span>
-              <span className="font-semibold">
-                {Math.round(savingsRate * 100) || 0}%
-              </span>
-            </div>
-            <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-              <div
-                className="h-full bg-emerald-500"
-                style={{
-                  width: `${Math.min(savingsRate * 100, 60)}%`,
-                }}
-              />
-            </div>
-            <p className="text-[11px] text-slate-500">
-              Aim for 20–30%+ savings rate over time. That’s what powers FIRE.
-            </p>
-
-            <div className="flex justify-between mt-2">
-              <span>EMI load (of income)</span>
-              <span className="font-semibold">
-                {Math.round(emiLoad * 100) || 0}%
-              </span>
-            </div>
-            <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-              <div
-                className="h-full bg-amber-400"
-                style={{
-                  width: `${Math.min(emiLoad * 100, 80)}%`,
-                }}
-              />
-            </div>
-            <p className="text-[11px] text-slate-500">
-              Try to keep EMIs under ~30% of income; above 40–50% starts to
-              strongly drag your PFI.
-            </p>
-
-            <div className="flex justify-between mt-2">
-              <span>Emergency fund</span>
-              <span className="font-semibold">
-                {emergencyMonths
-                  ? `${emergencyMonths.toFixed(1)} months`
-                  : "0"}
-              </span>
-            </div>
-            <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-              <div
-                className="h-full bg-sky-500"
-                style={{
-                  width: `${Math.min(
-                    (emergencyMonths / 12) * 100,
-                    100
-                  )}%`,
-                }}
-              />
-            </div>
-            <p className="text-[11px] text-slate-500">
-              Target 6–12 months of expenses in cash + liquid funds before going
-              very aggressive with investments.
-            </p>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 space-y-3">
-          <div className="text-xs font-semibold text-slate-200 mb-1">
-            Protection & investment depth
-          </div>
-          <div className="space-y-2 text-[11px] md:text-xs text-slate-200">
-            <div className="flex justify-between">
-              <span>Life cover vs income</span>
-              <span className="font-semibold">
-                {annualIncome > 0
-                  ? `${(
-                      (lifeCover / (annualIncome * 10)) *
-                      100
-                    ).toFixed(0) || 0}% of 10× target`
-                  : "—"}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500">
-              Very rough check: aim for 10–15× annual income of term cover if
-              you have dependents and loans.
-            </p>
-
-            <div className="flex justify-between mt-2">
-              <span>Health cover</span>
-              <span className="font-semibold">
-                {formatCurrency(healthCover)}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500">
-              Check this against the ranges on the FIRE tab. In metros with
-              dependents, 10–20L+ of cover is common.
-            </p>
-
-            <div className="flex justify-between mt-2">
-              <span>Investments vs annual spends</span>
-              <span className="font-semibold">
-                {investmentsToExpensesRatio
-                  ? `${investmentsToExpensesRatio.toFixed(1)}×`
-                  : "0×"}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500">
-              As this moves from 1× → 3× → 5×+ of annual expenses, your PFI and
-              FIRE readiness rise sharply.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* History + micro explanation */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 space-y-3">
-          <div className="flex items-center justify-between mb-1">
-            <div>
-              <div className="text-xs font-semibold text-slate-200">
-                PFI history & trend
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Save snapshots whenever your finances change. The chart includes
-                your saved points plus the current PFI as “Now”.
-              </p>
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              <button
-                type="button"
-                onClick={handleSaveClick}
-                disabled={isSavingCheckpoint || !onSaveCheckpoint}
-                className={
-                  "rounded-full px-3 py-1.5 text-[11px] font-semibold " +
-                  (!onSaveCheckpoint
-                    ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                    : "bg-emerald-500 text-slate-950 hover:bg-emerald-400")
-                }
-              >
-                {isSavingCheckpoint ? "Saving…" : "Save current PFI snapshot"}
-              </button>
-              {lastSavedText && (
-                <span className="text-[10px] text-slate-500">
-                  {lastSavedText}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={chartData}
-                margin={{ top: 10, right: 10, left: 0, bottom: 10 }}
-              >
-                <defs>
-                  <linearGradient
-                    id="pfiGradient"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop
-                      offset="5%"
-                      stopColor="#22c55e"
-                      stopOpacity={0.9}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor="#22c55e"
-                      stopOpacity={0.05}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#1e293b"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 10, fill: "#94a3b8" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  domain={[0, 100]}
-                  tick={{ fontSize: 10, fill: "#94a3b8" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#020617",
-                    border: "1px solid #1e293b",
-                    borderRadius: 12,
-                    fontSize: 11,
-                    color: "#e2e8f0",
-                  }}
-                  formatter={(value) => [
-                    `${Number(value).toFixed(1)}`,
-                    "PFI",
-                  ]}
-                  labelStyle={{ color: "#94a3b8" }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="score"
-                  stroke="#22c55e"
-                  strokeWidth={2}
-                  fill="url(#pfiGradient)"
-                  dot={{
-                    stroke: "#22c55e",
-                    strokeWidth: 1.5,
-                    r: 3,
-                    fill: "#0f172a",
-                  }}
-                  activeDot={{ r: 5 }}
-                >
-                  <LabelList
-                    dataKey="score"
-                    position="top"
-                    formatter={(val) => Number(val).toFixed(0)}
-                    style={{ fontSize: 10, fill: "#e2e8f0" }}
-                  />
-                </Area>
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
-            <div className="text-xs font-semibold text-slate-200 mb-1">
-              {microExplanationTitle}
-            </div>
-            <p className="text-[11px] md:text-xs text-slate-300">
-              {microExplanationBody}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
-            <div className="text-xs font-semibold text-slate-200 mb-1">
-              How to use this tab
-            </div>
-            <p className="text-[11px] md:text-xs text-slate-300 mb-2">
-              Use the Input tab to change your numbers, then come back here and
-              save a new PFI. The Score tab tells you:
-            </p>
-            <ul className="text-[11px] md:text-xs text-slate-300 space-y-1.5">
-              <li>
-                • Whether your overall setup is fragile, building, solid or
-                strong.
-              </li>
-              <li>
-                • Which levers (savings, EMIs, emergency fund, protection,
-                investments) are likely holding the score back.
-              </li>
-              <li>
-                • How your PFI is trending over time using the history chart.
-              </li>
-            </ul>
-            <p className="text-[11px] text-slate-500 mt-2">
-              The FIRE tab then takes this further into concrete SIP and corpus
-              planning, tuned for the Indian context.
-            </p>
-          </div>
-        </div>
-      </div>
+        <PfiHistoryChart history={pfiHistory} />
+      </section>
     </div>
   );
 }
