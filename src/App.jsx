@@ -1557,7 +1557,7 @@ function PfiHistoryChart({ checkpoints = [] }) {
               cx={x}
               cy={y}
               r={3}
-              fill="#0d00ffff"
+              fill="#ff0000ff"
               stroke="#020617"
               strokeWidth={1.5}
             />
