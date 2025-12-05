@@ -1363,8 +1363,8 @@ function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
   );
 }
 
-// Replace your existing PFIHistoryChart with this
-function PFIHistoryChart({ checkpoints }) {
+// Minimal PFI history chart – replace your existing PfiHistoryChart with this
+function PfiHistoryChart({ checkpoints }) {
   if (!checkpoints || checkpoints.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-xs text-slate-500">
@@ -1373,14 +1373,19 @@ function PFIHistoryChart({ checkpoints }) {
     )
   }
 
-  // SVG geometry
-  const svgWidth = 1000
+  // Basic SVG geometry
+  const svgWidth = 1200
   const svgHeight = 260
 
-  const chartLeft = 70   // room for y-axis + label
-  const chartRight = 960
-  const chartTop = 20
-  const chartBottom = 220
+  const marginLeft = 60
+  const marginRight = 40
+  const marginTop = 20
+  const marginBottom = 40
+
+  const chartLeft = marginLeft
+  const chartRight = svgWidth - marginRight
+  const chartTop = marginTop
+  const chartBottom = svgHeight - marginBottom
 
   const chartWidth = chartRight - chartLeft
   const chartHeight = chartBottom - chartTop
@@ -1406,14 +1411,14 @@ function PFIHistoryChart({ checkpoints }) {
     .map((cp, i) => {
       const x = getX(i)
       const y = getY(cp.score)
-      return `${i === 0 ? "M" : "L"} ${x} ${y}`
+      return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
     })
-    .join(" ")
+    .join(' ')
 
   // X-axis labels: compact dates
-  const formatter = new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
+  const formatter = new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
   })
 
   const labelEvery =
@@ -1459,13 +1464,13 @@ function PFIHistoryChart({ checkpoints }) {
           strokeWidth={1}
         />
 
-        {/* Y-axis ticks and labels (0, 50, 100) */}
+        {/* Y-axis ticks and labels (0, 50, 100) – subtle, minimal */}
         {[0, 50, 100].map((value) => {
           const y = getY(value)
           return (
             <g key={value}>
               <line
-                x1={chartLeft - 5}
+                x1={chartLeft - 4}
                 y1={y}
                 x2={chartLeft}
                 y2={y}
@@ -1473,7 +1478,7 @@ function PFIHistoryChart({ checkpoints }) {
                 strokeWidth={1}
               />
               <text
-                x={chartLeft - 10}
+                x={chartLeft - 8}
                 y={y + 3}
                 textAnchor="end"
                 fontSize="10"
@@ -1485,7 +1490,7 @@ function PFIHistoryChart({ checkpoints }) {
           )
         })}
 
-        {/* Y-axis label (rotated) */}
+        {/* Y-axis label – vertical, small */}
         <text
           x={20}
           y={(chartTop + chartBottom) / 2}
@@ -1497,7 +1502,7 @@ function PFIHistoryChart({ checkpoints }) {
           PFI SCORE
         </text>
 
-        {/* X-axis labels */}
+        {/* X-axis labels (dates) */}
         {checkpoints.map((cp, i) => {
           if (i % labelEvery !== 0 && i !== checkpoints.length - 1) return null
 
@@ -1532,7 +1537,7 @@ function PFIHistoryChart({ checkpoints }) {
           )
         })}
 
-        {/* Line */}
+        {/* PFI line – minimal, no labels on points */}
         <path
           d={linePath}
           fill="none"
@@ -1542,7 +1547,7 @@ function PFIHistoryChart({ checkpoints }) {
           strokeLinecap="round"
         />
 
-        {/* Point markers */}
+        {/* Point markers – very small dots */}
         {checkpoints.map((cp, i) => {
           const x = getX(i)
           const y = getY(cp.score)
@@ -1551,10 +1556,10 @@ function PFIHistoryChart({ checkpoints }) {
               key={cp.date + i}
               cx={x}
               cy={y}
-              r={4}
+              r={3}
               fill="#22c55e"
               stroke="#020617"
-              strokeWidth={2}
+              strokeWidth={1.5}
             />
           )
         })}
