@@ -1301,11 +1301,11 @@ function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
   );
 }
 
-// Minimal PFI history line chart with a bit more vertical breathing room
+// Minimal PFI history line chart with more vertical space
 function PfiHistoryChart({ history }) {
   if (!history || history.length === 0) {
     return (
-      <div className="flex items-center justify-center h-32 text-xs text-slate-500">
+      <div className="flex items-center justify-center h-48 text-xs text-slate-500">
         No checkpoints yet. Save your first PFI checkpoint to see progress.
       </div>
     );
@@ -1329,9 +1329,9 @@ function PfiHistoryChart({ history }) {
   const range = maxVal - minVal || 1;
 
   const width = 100;
-  const height = 60;          // more vertical space
+  const height = 80;          // taller SVG
   const xPadding = 8;
-  const yPadding = 10;
+  const yPadding = 12;
 
   const last = points[points.length - 1];
 
@@ -1370,7 +1370,7 @@ function PfiHistoryChart({ history }) {
 
   return (
     <div className="mt-2">
-      <div className="h-32 md:h-40 w-full">
+      <div className="h-48 md:h-64 w-full">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="w-full h-full"
