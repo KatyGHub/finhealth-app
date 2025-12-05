@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "./lib/supabaseClient";
+import { formatCurrency } from "./utils/formatCurrency";
 
 const INITIAL_DATA = {
   age: 30,
