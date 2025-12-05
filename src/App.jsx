@@ -724,264 +724,206 @@ function InputDetailsTab({
         </section>
 
         {/* 2. Income */}
-        <section
-          ref={incomeRef}
-          className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:p-5 space-y-4"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm md:text-base font-semibold text-slate-50">
-                Step 2 · Monthly income
-              </h2>
-              <p className="text-xs md:text-sm text-slate-300">
-                Regular monthly inflows after tax. This drives savings rate and
-                PFI.
-              </p>
-            </div>
-            <div className="text-right text-[11px] text-slate-400">
-              Total income / month
-              <div className="text-sm font-semibold text-slate-50">
-                {formatCurrency(totalIncome)}
-              </div>
-            </div>
-          </div>
+<section
+  ref={incomeRef}
+  className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:p-5 space-y-4"
+>
+  <div className="flex items-center justify-between gap-2">
+    <div>
+      <h2 className="text-sm md:text-base font-semibold text-slate-50">
+        Step 2 · Monthly income
+      </h2>
+      <p className="text-xs md:text-sm text-slate-300">
+        Regular monthly inflows after tax. This drives savings rate and
+        PFI.
+      </p>
+    </div>
+    <div className="text-right text-[11px] text-slate-400">
+      Total income / month
+      <div className="text-sm font-semibold text-slate-50">
+        {formatCurrency(totalIncome)}
+      </div>
+    </div>
+  </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-slate-300 mb-1">
-                Your fixed salary (in-hand, per month)
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={incomeSelf}
-                onChange={handleNumberChange("incomeSelf")}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-300 mb-1">
-                Spouse income (optional)
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={incomeSpouse}
-                onChange={handleNumberChange("incomeSpouse")}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-300 mb-1">
-                Other fixed income (rent, etc.)
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={incomeOther}
-                onChange={handleNumberChange("incomeOther")}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-300 mb-1">
-                Variable / bonus averaged per month
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={incomeVariable}
-                onChange={handleNumberChange("incomeVariable")}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-              <p className="text-[11px] text-slate-500 mt-1">
-                If your bonus is once a year, divide by 12 and enter here.
-              </p>
-            </div>
-          </div>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <QuickAmountField
+      label="Your fixed salary (in-hand, per month)"
+      value={incomeSelf}
+      onChange={(amount) => update({ incomeSelf: amount })}
+      suggestions={[30000, 50000, 75000, 100000]}
+    />
 
-          <div className="flex justify-between">
-            <button
-              type="button"
-              onClick={() => goToStep(0)}
-              className="text-[11px] rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 hover:bg-slate-800"
-            >
-              Back · You & family
-            </button>
-            <button
-              type="button"
-              onClick={() => goToStep(2)}
-              className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-xs md:text-sm font-semibold text-slate-950 hover:bg-emerald-400"
-            >
-              Next · Expenses
-            </button>
-          </div>
-        </section>
+    <QuickAmountField
+      label="Spouse income (optional)"
+      value={incomeSpouse}
+      onChange={(amount) => update({ incomeSpouse: amount })}
+      suggestions={[20000, 40000, 60000, 80000]}
+    />
 
-        {/* 3. Expenses */}
-        <section
-          ref={expensesRef}
-          className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:p-5 space-y-4"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm md:text-base font-semibold text-slate-50">
-                Step 3 · Monthly expenses
-              </h2>
-              <p className="text-xs md:text-sm text-slate-300">
-                Split your spends into fixed “needs” and variable “wants” to see
-                your true savings power.
-              </p>
-            </div>
-            <div className="text-right text-[11px] text-slate-400">
-              Fixed + variable / month
-              <div className="text-sm font-semibold text-slate-50">
-                {formatCurrency(totalExpenses)}
-              </div>
-            </div>
-          </div>
+    <QuickAmountField
+      label="Other fixed income (rent, etc.)"
+      value={incomeOther}
+      onChange={(amount) => update({ incomeOther: amount })}
+      suggestions={[5000, 10000, 20000, 30000]}
+    />
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4 space-y-3">
-              <div className="flex items-center justify-between mb-1">
-                <div className="text-xs font-semibold text-slate-200">
-                  Fixed expenses (needs)
-                </div>
-                <div className="text-[11px] text-slate-400">
-                  Total: {formatCurrency(safeFixedTotal)}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">
-                    Rent / home contribution
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={data.fixedRent ?? 0}
-                    onChange={handleNumberChange("fixedRent")}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">
-                    Groceries & essentials
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={data.fixedFood ?? 0}
-                    onChange={handleNumberChange("fixedFood")}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">
-                    Utilities (electricity, water, phone)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={data.fixedUtilities ?? 0}
-                    onChange={handleNumberChange("fixedUtilities")}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">
-                    Medical / insurance premiums (monthly equivalent)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={data.fixedMedical ?? 0}
-                    onChange={handleNumberChange("fixedMedical")}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-            </div>
+    <QuickAmountField
+      label="Variable / bonus averaged per month"
+      value={incomeVariable}
+      onChange={(amount) => update({ incomeVariable: amount })}
+      suggestions={[5000, 10000, 20000, 50000]}
+    />
+    <p className="text-[11px] text-slate-500 md:col-span-2">
+      If your bonus is once a year, divide by 12 and enter here. You can
+      also tap any of the chips above to quickly fill typical amounts.
+    </p>
+  </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4 space-y-3">
-              <div className="flex items-center justify-between mb-1">
-                <div className="text-xs font-semibold text-slate-200">
-                  Variable expenses (wants)
-                </div>
-                <div className="text-[11px] text-slate-400">
-                  Total: {formatCurrency(safeVariableTotal)}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">
-                    Wifi, OTT, subscriptions
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={data.varWifi ?? 0}
-                    onChange={handleNumberChange("varWifi")}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">
-                    Eating out & entertainment
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={data.varEntertainment ?? 0}
-                    onChange={handleNumberChange("varEntertainment")}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">
-                    Shopping & non-essentials
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={data.varShopping ?? 0}
-                    onChange={handleNumberChange("varShopping")}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-300 mb-1">
-                    Misc. lifestyle spends
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={data.varMisc ?? 0}
-                    onChange={handleNumberChange("varMisc")}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+  <div className="flex justify-between">
+    <button
+      type="button"
+      onClick={() => goToStep(0)}
+      className="text-[11px] rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 hover:bg-slate-800"
+    >
+      Back · You & family
+    </button>
+    <button
+      type="button"
+      onClick={() => goToStep(2)}
+      className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-xs md:text-sm font-semibold text-slate-950 hover:bg-emerald-400"
+    >
+      Next · Expenses
+    </button>
+  </div>
+</section>
 
-          <div className="flex justify-between">
-            <button
-              type="button"
-              onClick={() => goToStep(1)}
-              className="text-[11px] rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 hover:bg-slate-800"
-            >
-              Back · Income
-            </button>
-            <button
-              type="button"
-              onClick={() => goToStep(3)}
-              className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-xs md:text-sm font-semibold text-slate-950 hover:bg-emerald-400"
-            >
-              Next · Loans & EMIs
-            </button>
-          </div>
-        </section>
+       {/* 3. Expenses */}
+<section
+  ref={expensesRef}
+  className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:p-5 space-y-4"
+>
+  <div className="flex items-center justify-between gap-2">
+    <div>
+      <h2 className="text-sm md:text-base font-semibold text-slate-50">
+        Step 3 · Monthly expenses
+      </h2>
+      <p className="text-xs md:text-sm text-slate-300">
+        Split your spends into fixed “needs” and variable “wants” to see
+        your true savings power.
+      </p>
+    </div>
+    <div className="text-right text-[11px] text-slate-400">
+      Fixed + variable / month
+      <div className="text-sm font-semibold text-slate-50">
+        {formatCurrency(totalExpenses)}
+      </div>
+    </div>
+  </div>
+
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    {/* Fixed */}
+    <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4 space-y-3">
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-xs font-semibold text-slate-200">
+          Fixed expenses (needs)
+        </div>
+        <div className="text-[11px] text-slate-400">
+          Total: {formatCurrency(safeFixedTotal)}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3">
+        <QuickAmountField
+          label="Rent / home contribution"
+          value={data.fixedRent ?? 0}
+          onChange={(amount) => update({ fixedRent: amount })}
+          suggestions={[10000, 15000, 20000, 30000]}
+        />
+
+        <QuickAmountField
+          label="Groceries & essentials"
+          value={data.fixedFood ?? 0}
+          onChange={(amount) => update({ fixedFood: amount })}
+          suggestions={[5000, 8000, 12000, 15000]}
+        />
+
+        <QuickAmountField
+          label="Utilities (electricity, water, phone)"
+          value={data.fixedUtilities ?? 0}
+          onChange={(amount) => update({ fixedUtilities: amount })}
+          suggestions={[2000, 3000, 5000, 8000]}
+        />
+
+        <QuickAmountField
+          label="Medical / insurance premiums (monthly equivalent)"
+          value={data.fixedMedical ?? 0}
+          onChange={(amount) => update({ fixedMedical: amount })}
+          suggestions={[1000, 2000, 3000, 5000]}
+        />
+      </div>
+    </div>
+
+    {/* Variable */}
+    <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4 space-y-3">
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-xs font-semibold text-slate-200">
+          Variable expenses (wants)
+        </div>
+        <div className="text-[11px] text-slate-400">
+          Total: {formatCurrency(safeVariableTotal)}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3">
+        <QuickAmountField
+          label="Wifi, OTT, subscriptions"
+          value={data.varWifi ?? 0}
+          onChange={(amount) => update({ varWifi: amount })}
+          suggestions={[500, 1000, 1500, 2000]}
+        />
+
+        <QuickAmountField
+          label="Eating out & entertainment"
+          value={data.varEntertainment ?? 0}
+          onChange={(amount) => update({ varEntertainment: amount })}
+          suggestions={[2000, 4000, 6000, 8000]}
+        />
+
+        <QuickAmountField
+          label="Shopping & non-essentials"
+          value={data.varShopping ?? 0}
+          onChange={(amount) => update({ varShopping: amount })}
+          suggestions={[2000, 5000, 8000, 12000]}
+        />
+
+        <QuickAmountField
+          label="Misc. lifestyle spends"
+          value={data.varMisc ?? 0}
+          onChange={(amount) => update({ varMisc: amount })}
+          suggestions={[1000, 3000, 5000, 8000]}
+        />
+      </div>
+    </div>
+  </div>
+
+  <div className="flex justify-between">
+    <button
+      type="button"
+      onClick={() => goToStep(1)}
+      className="text-[11px] rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 hover:bg-slate-800"
+    >
+      Back · Income
+    </button>
+    <button
+      type="button"
+      onClick={() => goToStep(3)}
+      className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-xs md:text-sm font-semibold text-slate-950 hover:bg-emerald-400"
+    >
+      Next · Loans & EMIs
+    </button>
+  </div>
+</section>
 
         {/* 4. Loans */}
         <section
@@ -1384,16 +1326,11 @@ function PfiHistoryChart({ history }) {
     );
   }
 
-  const values = history.map((h) => Math.round(h.pfi));
-  const minPfi = Math.min(...values);
-  const maxPfi = Math.max(...values);
-  const range = Math.max(maxPfi - minPfi, 10); // avoid perfectly flat line
-
   const points = history.map((h, idx) => {
-    const pfi = Math.round(h.pfi);
+    const pfi = Math.round(h.pfi); // 0–100 range
     const x =
       history.length === 1 ? 50 : (idx / (history.length - 1)) * 100;
-    const y = 88 - ((pfi - minPfi) / range) * 60; // 28–88 vertical span
+    const y = 90 - (pfi / 100) * 60; // map 0–100 PFI into y 30–90
     return { x, y, pfi, created_at: h.created_at };
   });
 
@@ -1422,10 +1359,8 @@ function PfiHistoryChart({ history }) {
         className="w-full h-full"
         preserveAspectRatio="none"
       >
-        {/* Background */}
         <rect x="0" y="0" width="100" height="100" fill="transparent" />
 
-        {/* Line */}
         <polyline
           fill="none"
           stroke="#22c55e"
@@ -1433,20 +1368,17 @@ function PfiHistoryChart({ history }) {
           points={polylinePoints}
         />
 
-        {/* Points + pill labels */}
         {points.map((p, idx) => {
           const label = String(p.pfi);
-          const charWidth = 2.6; // SVG units per char
+          const charWidth = 2.6;
           const paddingX = 1.5;
-          const paddingY = 1.2;
           const boxWidth = label.length * charWidth + paddingX * 2;
-          const boxHeight = 6; // SVG units
+          const boxHeight = 6;
           const boxX = p.x - boxWidth / 2;
-          const boxY = p.y - boxHeight - 3; // 3 units above the dot
+          const boxY = p.y - boxHeight - 3;
 
           return (
             <g key={idx}>
-              {/* point */}
               <circle
                 cx={p.x}
                 cy={p.y}
@@ -1455,8 +1387,6 @@ function PfiHistoryChart({ history }) {
                 stroke="#020617"
                 strokeWidth="0.6"
               />
-
-              {/* pill background */}
               <rect
                 x={boxX}
                 y={boxY}
@@ -1468,8 +1398,6 @@ function PfiHistoryChart({ history }) {
                 stroke="#22c55e"
                 strokeWidth="0.5"
               />
-
-              {/* label text */}
               <text
                 x={p.x}
                 y={boxY + boxHeight / 2 + 0.4}
@@ -1484,7 +1412,6 @@ function PfiHistoryChart({ history }) {
           );
         })}
 
-        {/* Baseline */}
         <line
           x1="0"
           y1="93"
@@ -1494,7 +1421,6 @@ function PfiHistoryChart({ history }) {
           strokeWidth="0.4"
         />
 
-        {/* Start / end dates */}
         <text x="2" y="97" fontSize="2.6" fill="#64748b">
           {firstDate}
         </text>
@@ -3417,11 +3343,6 @@ function MetricChip({ label, value, comment }) {
       <p className="text-[11px] text-slate-400">{comment}</p>
     </div>
   );
-}
-
-function formatCurrency(num) {
-  const safe = Number(num) || 0;
-  return "₹" + safe.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 }
 
 function AuthLanding({ onLogin }) {
