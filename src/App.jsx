@@ -1301,48 +1301,42 @@ function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
   );
 }
 
-// Tiny SVG chart with PFI labels on each point
-// Tiny SVG chart with PFI labels on each point
+// Minimal PFI history line chart
 function PfiHistoryChart({ history }) {
   if (!history || history.length === 0) {
     return (
-      <div className="flex items-center justify-center h-40 text-xs text-slate-500">
-        No checkpoints yet. Save your first PFI checkpoint to see progress.
+      <div className="flex items-center justify-center h-32 text-xs text-slate-500">
+        No checkpoints yet. Save one from the PFI card above.
       </div>
     );
   }
 
-  if (history.length === 1) {
-    const value = Math.round(history[0].pfi);
-    return (
-      <div className="flex flex-col items-center justify-center h-40 text-xs text-slate-500">
-        <div className="mb-2">
-          Only one checkpoint so far. Add a few more to see a proper trend.
-        </div>
-        <div className="flex items-center gap-2 text-emerald-400 text-sm">
-          ● <span>PFI {value}</span>
-        </div>
-      </div>
-    );
-  }
+  // Clamp PFI to 0–100 and map to simple SVG coords
+  const yTop = 8;
+  const yBottom = 32;
 
   const points = history.map((h, idx) => {
-    const pfi = Math.round(h.pfi); // 0–100 range
+    const raw = Number(h.pfi) || 0;
+    const pfi = Math.max(0, Math.min(100, raw));
+
     const x =
       history.length === 1 ? 50 : (idx / (history.length - 1)) * 100;
-    const y = 90 - (pfi / 100) * 60; // map 0–100 PFI into y 30–90
-    return { x, y, pfi, created_at: h.created_at };
+
+    const y = yBottom - (pfi / 100) * (yBottom - yTop);
+
+    return {
+      x,
+      y,
+      pfi,
+      created_at: h.created_at,
+    };
   });
 
   const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(" ");
 
   const firstDate = new Date(history[0].created_at).toLocaleDateString(
     "en-IN",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "2-digit",
-    }
+    { day: "2-digit", month: "short", year: "2-digit" }
   );
   const lastDate = new Date(
     history[history.length - 1].created_at
@@ -1353,93 +1347,53 @@ function PfiHistoryChart({ history }) {
   });
 
   return (
-    <div className="h-40 w-full">
-      <svg
-        viewBox="0 0 100 100"
-        className="w-full h-full"
-        preserveAspectRatio="none"
-      >
-        <rect x="0" y="0" width="100" height="100" fill="transparent" />
-
-        <polyline
-          fill="none"
-          stroke="#22c55e"
-          strokeWidth="1.2"
-          points={polylinePoints}
-        />
-
-        {points.map((p, idx) => {
-          const label = String(p.pfi);
-          const charWidth = 2.6;
-          const paddingX = 1.5;
-          const boxWidth = label.length * charWidth + paddingX * 2;
-          const boxHeight = 6;
-          const boxX = p.x - boxWidth / 2;
-          const boxY = p.y - boxHeight - 3;
-
-          return (
-            <g key={idx}>
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r="1.8"
-                fill="#22c55e"
-                stroke="#020617"
-                strokeWidth="0.6"
-              />
-              <rect
-                x={boxX}
-                y={boxY}
-                width={boxWidth}
-                height={boxHeight}
-                rx={boxHeight / 2}
-                ry={boxHeight / 2}
-                fill="#020617"
-                stroke="#22c55e"
-                strokeWidth="0.5"
-              />
-              <text
-                x={p.x}
-                y={boxY + boxHeight / 2 + 0.4}
-                textAnchor="middle"
-                fontSize="3"
-                fill="#e2e8f0"
-                dominantBaseline="middle"
-              >
-                {label}
-              </text>
-            </g>
-          );
-        })}
-
-        <line
-          x1="0"
-          y1="93"
-          x2="100"
-          y2="93"
-          stroke="#1e293b"
-          strokeWidth="0.4"
-        />
-
-        <text x="2" y="97" fontSize="2.6" fill="#64748b">
-          {firstDate}
-        </text>
-        <text
-          x="98"
-          y="97"
-          fontSize="2.6"
-          textAnchor="end"
-          fill="#64748b"
+    <div className="w-full">
+      <div className="h-32 w-full">
+        <svg
+          viewBox="0 0 100 40"
+          className="w-full h-full"
+          preserveAspectRatio="none"
         >
-          {lastDate}
-        </text>
-      </svg>
+          {/* subtle baseline */}
+          <line
+            x1="0"
+            y1={yBottom + 2}
+            x2="100"
+            y2={yBottom + 2}
+            stroke="#1e293b"
+            strokeWidth="0.4"
+          />
 
-      <div className="flex justify-between mt-2 text-[11px] text-slate-500">
-        <span>Oldest on the left, latest on the right.</span>
+          {/* line */}
+          <polyline
+            fill="none"
+            stroke="#22c55e"
+            strokeWidth="1.4"
+            points={polylinePoints}
+          />
+
+          {/* points */}
+          {points.map((p, idx) => (
+            <circle
+              key={idx}
+              cx={p.x}
+              cy={p.y}
+              r="1.8"
+              fill="#22c55e"
+              stroke="#020617"
+              strokeWidth="0.7"
+            />
+          ))}
+        </svg>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+        <span>
+          Oldest: {firstDate} · Latest: {lastDate}
+        </span>
         <span>
           Checkpoints: {history.length} · Latest PFI:{" "}
-          {Math.round(history[history.length - 1].pfi)}
+          {Math.round(history[history.length - 1].pfi || 0)}
         </span>
       </div>
     </div>
@@ -1597,17 +1551,30 @@ function ScoreTab({
         </div>
       </section>
 
-      {/* History section */}
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 md:p-6 space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-100">
-            PFI history
-          </h3>
-          <p className="text-xs text-slate-400 mt-1">
-            Each checkpoint is stored when you click “Save this PFI
-            checkpoint”. This shows how your Portfolio FinHealth Index has
-            moved over time.
-          </p>
+            {/* History section */}
+      <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:p-5 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-100">
+              PFI history
+            </h3>
+            <p className="text-xs text-slate-400">
+              We plot each checkpoint you save. Simple line, oldest on the
+              left, latest on the right.
+            </p>
+          </div>
+
+          {pfiHistory && pfiHistory.length > 0 && (
+            <div className="text-[11px] text-right text-slate-400">
+              <div>Checkpoints: {pfiHistory.length}</div>
+              <div className="text-slate-200">
+                Latest PFI:{" "}
+                {Math.round(
+                  pfiHistory[pfiHistory.length - 1].pfi || 0
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <PfiHistoryChart history={pfiHistory} />
