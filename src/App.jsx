@@ -56,9 +56,10 @@ function App() {
   const [data, setData] = useState(INITIAL_DATA);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
 
-  // PFI history (for chart)
+    // PFI history (for chart)
   const [pfiHistory, setPfiHistory] = useState([]);
   const [isSavingCheckpoint, setIsSavingCheckpoint] = useState(false);
+  const [isDeletingCheckpoint, setIsDeletingCheckpoint] = useState(false);
 
   // -------------------
   // Auth: session + listener
@@ -186,15 +187,14 @@ function App() {
     return () => clearTimeout(timer);
   }, [user, data, isProfileLoading]); // pfiHistory handled separately
 
-    // -------------------
-  // Save a new PFI checkpoint
+  // -------------------
+  // PFI checkpoints: save, delete, export
   // -------------------
 
   async function handleSaveCheckpoint(pfiValue) {
     if (!user) return;
     if (typeof pfiValue !== "number") return;
 
-    // Safe ID generation (works even if crypto is not available)
     const id =
       typeof crypto !== "undefined" &&
       typeof crypto.randomUUID === "function"
@@ -209,12 +209,11 @@ function App() {
 
     const updatedHistory = [...pfiHistory, newPoint];
 
-    // Optimistic update so the chart moves immediately
     setPfiHistory(updatedHistory);
     setIsSavingCheckpoint(true);
 
     try {
-      // Best-effort write to dedicated table (optional, safe to fail)
+      // Best-effort write to dedicated table (optional)
       const { error: insertError } = await supabase
         .from("pfi_history")
         .insert({
@@ -230,13 +229,73 @@ function App() {
       await saveProfileToSupabase(data, updatedHistory);
     } catch (error) {
       console.error("Error saving PFI checkpoint", error);
-      // Even if insert fails, still persist history inside profile
       await saveProfileToSupabase(data, updatedHistory);
     } finally {
       setIsSavingCheckpoint(false);
     }
   }
- 
+
+  async function handleDeleteLastCheckpoint() {
+    if (!user) return;
+    if (!pfiHistory.length) return;
+
+    const lastPoint = pfiHistory[pfiHistory.length - 1];
+
+    const confirmDelete = window.confirm(
+      `Delete the latest checkpoint (PFI ${Math.round(
+        lastPoint.pfi
+      )} saved on ${new Date(lastPoint.created_at).toLocaleDateString(
+        "en-IN",
+        { day: "2-digit", month: "short", year: "2-digit" }
+      )})?`
+    );
+
+    if (!confirmDelete) return;
+
+    const updatedHistory = pfiHistory.slice(0, -1);
+
+    // Optimistic update
+    setPfiHistory(updatedHistory);
+    setIsDeletingCheckpoint(true);
+
+    try {
+      // Source of truth: profile JSON
+      await saveProfileToSupabase(data, updatedHistory);
+      // (Optional) you could also delete from pfi_history table by user_id + created_at if needed.
+    } catch (error) {
+      console.error("Error deleting last PFI checkpoint", error);
+      // In case of error you could choose to restore the old history if you want stricter consistency.
+    } finally {
+      setIsDeletingCheckpoint(false);
+    }
+  }
+
+  function handleExportHistory() {
+    if (!pfiHistory || pfiHistory.length === 0) return;
+
+    const header = "id,pfi,created_at\n";
+    const rows = pfiHistory.map((p) =>
+      `${p.id || ""},${Math.round(p.pfi)},${p.created_at}`
+    );
+    const csv = header + rows.join("\n");
+
+    try {
+      const blob = new Blob([csv], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "pfi_history.csv";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error exporting PFI history CSV", error);
+    }
+  }
+
   // -------------------
   // Local helpers
   // -------------------
@@ -373,7 +432,7 @@ function App() {
             />
           )}
 
-          {activeTab === "Your Score" && (
+            {activeTab === "Your Score" && (
             <ScoreTab
               data={data}
               fixedTotal={fixedTotal}
@@ -385,6 +444,9 @@ function App() {
               pfiHistory={pfiHistory}
               onSaveCheckpoint={handleSaveCheckpoint}
               isSavingCheckpoint={isSavingCheckpoint}
+              onDeleteLastCheckpoint={handleDeleteLastCheckpoint}
+              isDeletingCheckpoint={isDeletingCheckpoint}
+              onExportHistory={handleExportHistory}
             />
           )}
 
@@ -1301,135 +1363,104 @@ function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
   );
 }
 
-// Minimal PFI history line chart with more vertical space
+// Minimal PFI history line chart
 function PfiHistoryChart({ history }) {
   if (!history || history.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-xs text-slate-500">
+      <div className="flex items-center justify-center h-40 text-xs text-slate-500">
         No checkpoints yet. Save your first PFI checkpoint to see progress.
       </div>
     );
   }
 
-  const points = history.map((h, idx) => ({
-    index: idx,
-    value: Math.round(Number(h.pfi) || 0),
-    created_at: h.created_at,
-  }));
-
-  const values = points.map((p) => p.value);
-  let minVal = Math.min(...values);
-  let maxVal = Math.max(...values);
-
-  if (minVal === maxVal) {
-    minVal = Math.max(0, minVal - 5);
-    maxVal = Math.min(100, maxVal + 5);
+  if (history.length === 1) {
+    const value = Math.round(history[0].pfi);
+    return (
+      <div className="flex flex-col items-center justify-center h-40 text-xs text-slate-500">
+        <div className="mb-2">
+          Only one checkpoint so far. Add a few more to see a proper trend.
+        </div>
+        <div className="flex items-center gap-2 text-emerald-400 text-sm">
+          ● <span>PFI {value}</span>
+        </div>
+      </div>
+    );
   }
 
-  const range = maxVal - minVal || 1;
-
-  const width = 100;
-  const height = 80;          // taller SVG
-  const xPadding = 8;
-  const yPadding = 12;
-
-  const last = points[points.length - 1];
-
-  const firstDate = new Date(points[0].created_at).toLocaleDateString(
-    "en-IN",
-    { day: "2-digit", month: "short", year: "2-digit" }
+  const sorted = [...history].sort(
+    (a, b) => new Date(a.created_at) - new Date(b.created_at)
   );
-  const lastDate = new Date(last.created_at).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "2-digit",
+
+  const values = sorted.map((h) => Number(h.pfi) || 0);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+
+  const topY = 20;
+  const bottomY = 80;
+
+  const points = sorted.map((h, idx) => {
+    const pfi = Number(h.pfi) || 0;
+    const x =
+      sorted.length === 1 ? 50 : (idx / (sorted.length - 1)) * 100;
+    const norm = (pfi - min) / range; // 0..1
+    const y = bottomY - norm * (bottomY - topY);
+    return { x, y, pfi, created_at: h.created_at };
   });
 
-  const getX = (i) => {
-    if (points.length === 1) return width / 2;
-    const t = i / (points.length - 1);
-    return xPadding + t * (width - xPadding * 2);
-  };
-
-  const getY = (v) => {
-    const norm = (v - minVal) / range;
-    return height - (yPadding + norm * (height - yPadding * 2));
-  };
-
-  const svgPoints = points.map((p) => ({
-    ...p,
-    x: getX(p.index),
-    y: getY(p.value),
-  }));
-
-  const pathD = svgPoints
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
-    .join(" ");
-
-  const labelStep = svgPoints.length > 10 ? 2 : 1;
+  const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(" ");
 
   return (
-    <div className="mt-2">
-      <div className="h-48 md:h-64 w-full">
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-full"
-          preserveAspectRatio="none"
-        >
-          {/* subtle band between min and max */}
-          <rect
-            x="0"
-            y={getY(maxVal)}
-            width={width}
-            height={getY(minVal) - getY(maxVal)}
-            fill="rgba(15,23,42,0.55)"
-          />
+    <div className="h-40 w-full">
+      <svg
+        viewBox="0 0 100 100"
+        className="w-full h-full"
+        preserveAspectRatio="none"
+      >
+        {/* background */}
+        <rect x="0" y="0" width="100" height="100" fill="transparent" />
 
-          {/* main line */}
-          <path
-            d={pathD}
-            fill="none"
-            stroke="#22c55e"
-            strokeWidth="0.9"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
+        {/* mid reference line */}
+        <line
+          x1="0"
+          y1={(topY + bottomY) / 2}
+          x2="100"
+          y2={(topY + bottomY) / 2}
+          stroke="#1e293b"
+          strokeWidth="0.3"
+        />
 
-          {/* points + compact labels */}
-          {svgPoints.map((p, idx) => (
-            <g key={idx}>
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r="1"
-                fill="#22c55e"
-                stroke="#020617"
-                strokeWidth="0.35"
-              />
-              {idx % labelStep === 0 && (
-                <text
-                  x={p.x}
-                  y={p.y - 2.5}
-                  fontSize="2.2"
-                  fill="#cbd5f5"
-                  textAnchor="middle"
-                >
-                  {p.value}
-                </text>
-              )}
-            </g>
-          ))}
-        </svg>
-      </div>
+        {/* main line */}
+        <polyline
+          fill="none"
+          stroke="#22c55e"
+          strokeWidth="1.2"
+          points={polylinePoints}
+        />
 
-      <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
-        <span>
-          Oldest: {firstDate} · Latest: {lastDate}
-        </span>
-        <span>
-          Checkpoints: {history.length} · Latest PFI: {last.value}
-        </span>
-      </div>
+        {/* points + tiny labels */}
+        {points.map((p, idx) => (
+          <g key={idx}>
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r="1.6"
+              fill="#22c55e"
+              stroke="#020617"
+              strokeWidth="0.5"
+            />
+            <text
+              x={p.x}
+              y={p.y - 3}
+              textAnchor="middle"
+              fontSize="2.6"
+              fill="#e2e8f0"
+            >
+              {Math.round(p.pfi)}
+            </text>
+          </g>
+        ))}
+      </svg>
     </div>
   );
 }
@@ -1445,6 +1476,9 @@ function ScoreTab({
   pfiHistory,
   onSaveCheckpoint,
   isSavingCheckpoint,
+  onDeleteLastCheckpoint,
+  isDeletingCheckpoint,
+  onExportHistory,
 }) {
   // Core metrics
   const savingsRate = totalIncome > 0 ? monthlySavings / totalIncome : 0;
@@ -1470,29 +1504,25 @@ function ScoreTab({
       : 100;
 
   // Stricter scoring
-  // Savings: 0–40
   let savingsScore = 0;
   if (savingsRate >= 0.3) savingsScore = 40;
   else if (savingsRate >= 0.2) savingsScore = 30;
   else if (savingsRate >= 0.1) savingsScore = 15;
   else if (savingsRate > 0) savingsScore = 5;
 
-  // Emergency fund: 0–20
   let efScore = 0;
   if (emergencyMonths >= 6) efScore = 20;
   else if (emergencyMonths >= 3) efScore = 12;
   else if (emergencyMonths > 0) efScore = 5;
 
-  // EMI load (lower is better): 0–20
   let emiScore = 0;
   if (emiRatio <= 0.2) emiScore = 20;
   else if (emiRatio <= 0.3) emiScore = 15;
   else if (emiRatio <= 0.4) emiScore = 8;
   else if (emiRatio <= 0.5) emiScore = 3;
 
-  // Protection cover: 0–20 (smaller gap is better)
   let protectionScore = 0;
-  if (coverGapPct <= 0) protectionScore = 20; // fully covered or more
+  if (coverGapPct <= 0) protectionScore = 20;
   else if (coverGapPct <= 25) protectionScore = 15;
   else if (coverGapPct <= 50) protectionScore = 8;
   else if (coverGapPct <= 75) protectionScore = 3;
@@ -1500,6 +1530,71 @@ function ScoreTab({
   const pfiScore = Math.round(
     savingsScore + efScore + emiScore + protectionScore
   );
+
+  // History insights
+  const hasHistory = pfiHistory && pfiHistory.length > 0;
+
+  function formatDateLabel(iso) {
+    return new Date(iso).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "2-digit",
+    });
+  }
+
+  let bestPFI = null;
+  let bestDateLabel = "";
+  let avgLast5 = null;
+  let latestPFI = null;
+  let previousPFI = null;
+  let deltaLabel = "";
+  let deltaClass = "text-slate-300";
+  let oldestDateLabel = "";
+  let latestDateLabel = "";
+
+  if (hasHistory) {
+    const sorted = [...pfiHistory].sort(
+      (a, b) => new Date(a.created_at) - new Date(b.created_at)
+    );
+    const count = sorted.length;
+
+    const lastPoint = sorted[count - 1];
+    const prevPoint = count > 1 ? sorted[count - 2] : null;
+
+    latestPFI = Math.round(lastPoint.pfi);
+    previousPFI = prevPoint ? Math.round(prevPoint.pfi) : null;
+
+    if (previousPFI == null || latestPFI === previousPFI) {
+      deltaLabel = "No change vs last checkpoint";
+      deltaClass = "text-slate-300";
+    } else if (latestPFI > previousPFI) {
+      const diff = latestPFI - previousPFI;
+      deltaLabel = `Up by ${diff} vs last checkpoint`;
+      deltaClass = "text-emerald-300";
+    } else {
+      const diff = previousPFI - latestPFI;
+      deltaLabel = `Down by ${diff} vs last checkpoint`;
+      deltaClass = "text-rose-300";
+    }
+
+    // Best PFI
+    let bestPoint = sorted[0];
+    for (const p of sorted) {
+      if (p.pfi > bestPoint.pfi) bestPoint = p;
+    }
+    bestPFI = Math.round(bestPoint.pfi);
+    bestDateLabel = formatDateLabel(bestPoint.created_at);
+
+    // Avg of last 5
+    const lastFive = sorted.slice(-5);
+    const avg =
+      lastFive.reduce((sum, p) => sum + (Number(p.pfi) || 0), 0) /
+      lastFive.length;
+    avgLast5 = Math.round(avg);
+
+    oldestDateLabel = formatDateLabel(sorted[0].created_at);
+    latestDateLabel = formatDateLabel(sorted[count - 1].created_at);
+  }
 
   return (
     <div className="space-y-6">
@@ -1542,7 +1637,9 @@ function ScoreTab({
             <div className="text-5xl font-semibold text-emerald-400">
               {pfiScore}
             </div>
-            <div className="text-[11px] text-slate-500 mt-1 mb-3">/ 100</div>
+            <div className="text-[11px] text-slate-500 mt-1 mb-3">
+              / 100
+            </div>
             <p className="text-[11px] text-slate-400 max-w-[170px]">
               Higher is better. Focus on improving one pillar at a time.
             </p>
@@ -1585,119 +1682,85 @@ function ScoreTab({
         </div>
       </section>
 
-            {/* History section */}
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:p-5 space-y-3">
-        <div className="flex items-center justify-between gap-2">
+      {/* History section */}
+      <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 md:p-6 space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-slate-100">
               PFI history
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-400 mt-1">
               We plot each checkpoint you save. Simple line, oldest on the
               left, latest on the right.
             </p>
           </div>
 
-          {pfiHistory && pfiHistory.length > 0 && (
-            <div className="text-[11px] text-right text-slate-400">
-              <div>Checkpoints: {pfiHistory.length}</div>
-              <div className="text-slate-200">
-                Latest PFI:{" "}
-                {Math.round(
-                  pfiHistory[pfiHistory.length - 1].pfi || 0
-                )}
+          {hasHistory && (
+            <div className="flex flex-wrap gap-2 text-[11px] md:text-xs">
+              <div className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 flex items-baseline gap-1 text-slate-200">
+                <span className="text-slate-400">Best</span>
+                <span className="font-semibold text-emerald-300">
+                  {bestPFI}
+                </span>
+                <span className="text-slate-500 text-[10px]">
+                  {bestDateLabel}
+                </span>
+              </div>
+              <div className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 flex items-baseline gap-1 text-slate-200">
+                <span className="text-slate-400">Last 5 avg</span>
+                <span className="font-semibold">
+                  {avgLast5 != null ? avgLast5 : "-"}
+                </span>
+              </div>
+              <div className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1 flex items-baseline gap-1">
+                <span className="text-slate-400">Trend</span>
+                <span className={`font-semibold ${deltaClass}`}>
+                  {deltaLabel}
+                </span>
               </div>
             </div>
           )}
         </div>
 
         <PfiHistoryChart history={pfiHistory} />
+
+        {hasHistory && (
+          <div className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-[11px] text-slate-500">
+            <div>
+              Oldest: {oldestDateLabel} · Latest: {latestDateLabel}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span>
+                Checkpoints: {pfiHistory.length} · Latest PFI:{" "}
+                {latestPFI}
+              </span>
+              <button
+                type="button"
+                onClick={onExportHistory}
+                className="text-[11px] rounded-full border border-slate-700 px-3 py-1 text-slate-200 hover:bg-slate-800"
+              >
+                Export CSV
+              </button>
+              <button
+                type="button"
+                onClick={onDeleteLastCheckpoint}
+                disabled={isDeletingCheckpoint || !pfiHistory.length}
+                className="text-[11px] rounded-full border border-slate-700 px-3 py-1 text-slate-200 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeletingCheckpoint ? "Deleting…" : "Delete last"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!hasHistory && (
+          <div className="mt-2 text-[11px] text-slate-500">
+            Once you save a few checkpoints, we’ll show the oldest and
+            latest dates plus quick stats here.
+          </div>
+        )}
       </section>
     </div>
-  );
-}
-
-function Sparkline({ history }) {
-  if (!history || history.length === 0) return null;
-
-  const values = history.map((h) => h.pfi);
-  const points = history.map((h, idx) => ({
-    x: idx,
-    y: h.pfi,
-  }));
-
-  // If there is only one point, duplicate it so we still draw a line
-  if (points.length === 1) {
-    points.push({ x: 1, y: points[0].y });
-    values.push(points[0].y);
-  }
-
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
-
-  // Zoom into the actual range so small changes are visible.
-  // Add a bit of padding so the line doesn't stick to the borders.
-  let domainMin = rawMin;
-  let domainMax = rawMax;
-
-  if (domainMax - domainMin < 5) {
-    const pad = (5 - (domainMax - domainMin)) / 2;
-    domainMin = Math.max(0, domainMin - pad);
-    domainMax = Math.min(100, domainMax + pad);
-  }
-
-  const range = domainMax - domainMin || 1;
-
-  const maxX = points.length - 1 || 1;
-  const width = 260;
-  const height = 80;
-  const padding = 8;
-
-  const toSvgCoords = (p) => {
-    const normX = p.x / maxX;
-    const normY = (p.y - domainMin) / range; // 0…1 within [domainMin, domainMax]
-
-    const x =
-      padding + normX * (width - padding * 2);
-    const y =
-      height -
-      (padding + normY * (height - padding * 2));
-
-    return { x, y };
-  };
-
-  const path = points
-    .map((p, idx) => {
-      const { x, y } = toSvgCoords(p);
-      return `${idx === 0 ? "M" : "L"} ${x} ${y}`;
-    })
-    .join(" ");
-
-  return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      className="w-full h-full"
-      preserveAspectRatio="none"
-    >
-      <path
-        d={path}
-        fill="none"
-        stroke="rgb(52 211 153)"
-        strokeWidth="1.5"
-      />
-      {points.map((p, idx) => {
-        const { x, y } = toSvgCoords(p);
-        return (
-          <circle
-            key={idx}
-            cx={x}
-            cy={y}
-            r="2"
-            fill="rgb(52 211 153)"
-          />
-        );
-      })}
-    </svg>
   );
 }
 
