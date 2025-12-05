@@ -185,17 +185,23 @@ function App() {
     return () => clearTimeout(timer);
   }, [user, data, isProfileLoading]); // pfiHistory handled separately
 
-  // -------------------
+    // -------------------
   // Save a new PFI checkpoint
   // -------------------
+  
   async function handleSaveCheckpoint(pfiValue) {
     if (!user) return;
     if (typeof pfiValue !== "number") return;
 
-    const newPoint = {
-      id: crypto.randomUUID
+    // Safe ID generation (works even if crypto is not available)
+    const id =
+      typeof crypto !== "undefined" &&
+      typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random()}`,
+        : `${Date.now()}-${Math.random()}`;
+
+    const newPoint = {
+      id,
       pfi: pfiValue,
       created_at: new Date().toISOString(),
     };
@@ -208,10 +214,16 @@ function App() {
 
     try {
       // Best-effort write to dedicated table (optional, safe to fail)
-      await supabase.from("pfi_history").insert({
-        user_id: user.id,
-        pfi: pfiValue,
-      });
+      const { error: insertError } = await supabase
+        .from("pfi_history")
+        .insert({
+          user_id: user.id,
+          pfi: pfiValue,
+        });
+
+      if (insertError) {
+        console.error("Error inserting into pfi_history", insertError);
+      }
 
       // Source of truth: embed history in profile JSON
       await saveProfileToSupabase(data, updatedHistory);
@@ -223,7 +235,7 @@ function App() {
       setIsSavingCheckpoint(false);
     }
   }
-
+ 
   // -------------------
   // Local helpers
   // -------------------
@@ -2494,7 +2506,7 @@ function SwotTab({
   const lifeCoverRatio =
     targetLifeCover > 0 ? data.lifeCover / targetLifeCover : 0;
 
-  const baseHealthTarget = 750_000;
+  const baseHealthTarget = 750000;
   const depFactor = 1 + (data.dependents || 0) * 0.25;
   const metroBump = data.cityTier === "metro" ? 1.3 : 1;
   const targetHealthCover = baseHealthTarget * depFactor * metroBump;
