@@ -1363,7 +1363,7 @@ function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
   );
 }
 
-// Minimal PFI history line chart
+// Minimal PFI history line chart with scores along bottom baseline
 function PfiHistoryChart({ history }) {
   if (!history || history.length === 0) {
     return (
@@ -1398,6 +1398,7 @@ function PfiHistoryChart({ history }) {
 
   const topY = 20;
   const bottomY = 80;
+  const baselineY = 93; // bottom baseline for score labels
 
   const points = sorted.map((h, idx) => {
     const pfi = Number(h.pfi) || 0;
@@ -1420,7 +1421,7 @@ function PfiHistoryChart({ history }) {
         {/* background */}
         <rect x="0" y="0" width="100" height="100" fill="transparent" />
 
-        {/* mid reference line */}
+        {/* subtle mid reference line */}
         <line
           x1="0"
           y1={(topY + bottomY) / 2}
@@ -1428,6 +1429,16 @@ function PfiHistoryChart({ history }) {
           y2={(topY + bottomY) / 2}
           stroke="#1e293b"
           strokeWidth="0.3"
+        />
+
+        {/* bottom baseline for labels (your “red line”) */}
+        <line
+          x1="0"
+          y1={baselineY}
+          x2="100"
+          y2={baselineY}
+          stroke="#0f172a"
+          strokeWidth="0.5"
         />
 
         {/* main line */}
@@ -1438,7 +1449,7 @@ function PfiHistoryChart({ history }) {
           points={polylinePoints}
         />
 
-        {/* points + tiny labels */}
+        {/* points */}
         {points.map((p, idx) => (
           <g key={idx}>
             <circle
@@ -1449,16 +1460,30 @@ function PfiHistoryChart({ history }) {
               stroke="#020617"
               strokeWidth="0.5"
             />
-            <text
-              x={p.x}
-              y={p.y - 3}
-              textAnchor="middle"
-              fontSize="2.6"
-              fill="#e2e8f0"
-            >
-              {Math.round(p.pfi)}
-            </text>
+            {/* subtle guide from point down towards baseline */}
+            <line
+              x1={p.x}
+              y1={p.y + 2}
+              x2={p.x}
+              y2={baselineY - 3}
+              stroke="#1e293b"
+              strokeWidth="0.3"
+            />
           </g>
+        ))}
+
+        {/* scores along the bottom baseline */}
+        {points.map((p, idx) => (
+          <text
+            key={`label-${idx}`}
+            x={p.x}
+            y={baselineY - 1.5}
+            textAnchor="middle"
+            fontSize="2.4"
+            fill="#e2e8f0"
+          >
+            {Math.round(p.pfi)}
+          </text>
         ))}
       </svg>
     </div>
