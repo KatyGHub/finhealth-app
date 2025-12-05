@@ -364,41 +364,46 @@ function App() {
   // -------------------
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between bg-slate-950/80 backdrop-blur">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xs font-semibold text-emerald-300">
-            FH
-          </div>
-          <div>
-            <div className="text-base font-semibold tracking-wide">
-              Findependence – Build Wealth. Retire Earlier.
-            </div>
-            <div className="text-xs text-slate-400">
-              FinHealth – Indian Portfolio &amp; FIRE Coach
-            </div>
-          </div>
-        </div>
+     <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between bg-slate-950/80 backdrop-blur">
+  <div className="flex items-center gap-3">
+    <div className="h-9 w-9 rounded-xl overflow-hidden bg-slate-900 border border-emerald-400/40 flex items-center justify-center">
+      <img
+        src="/vite.svg"
+        alt="Findependence logo"
+        className="h-7 w-7 object-contain"
+      />
+    </div>
+    <div>
+      <div className="text-base font-semibold tracking-wide">
+        Findependence – Build Wealth. Retire Earlier.
+      </div>
+      <div className="text-xs text-slate-400">
+        FinHealth – Indian Portfolio &amp; FIRE Coach
+      </div>
+    </div>
+  </div>
 
-        <div className="hidden md:flex items-center gap-4 text-xs text-slate-400">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 mr-1" />
-            Live simulator · Updates as you fill details
-          </div>
+  <div className="hidden md:flex items-center gap-4 text-xs text-slate-400">
+    <div className="flex items-center gap-2">
+      <span className="h-2 w-2 rounded-full bg-emerald-400 mr-1" />
+      Live simulator · Updates as you fill details
+    </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-slate-300 max-w-[160px] truncate">
-              {user.user_metadata?.full_name || user.email}
-            </span>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-full border border-slate-700 px-3 py-1 text-slate-200 hover:bg-slate-800"
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="flex items-center gap-2">
+      <span className="text-slate-300 max-w-[160px] truncate">
+        {user.user_metadata?.full_name || user.email}
+      </span>
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="rounded-full border border-slate-700 px-3 py-1 text-slate-200 hover:bg-slate-800"
+      >
+        Sign out
+      </button>
+    </div>
+  </div>
+</header>
+
 
       <main className="flex-1 flex flex-col md:flex-row">
         <section className="flex-1 px-4 md:px-8 py-6 space-y-4 overflow-y-auto">
