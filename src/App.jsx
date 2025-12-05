@@ -1301,7 +1301,7 @@ function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
   );
 }
 
-// Minimal PFI history line chart with subtle labels
+// Minimal PFI history line chart with a bit more vertical breathing room
 function PfiHistoryChart({ history }) {
   if (!history || history.length === 0) {
     return (
@@ -1329,9 +1329,9 @@ function PfiHistoryChart({ history }) {
   const range = maxVal - minVal || 1;
 
   const width = 100;
-  const height = 40;
+  const height = 60;          // more vertical space
   const xPadding = 8;
-  const yPadding = 8;
+  const yPadding = 10;
 
   const last = points[points.length - 1];
 
@@ -1366,24 +1366,23 @@ function PfiHistoryChart({ history }) {
     .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
     .join(" ");
 
-  // For many points, show labels on every 2nd point to keep it clean
   const labelStep = svgPoints.length > 10 ? 2 : 1;
 
   return (
     <div className="mt-2">
-      <div className="h-28 md:h-32 w-full">
+      <div className="h-32 md:h-40 w-full">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="w-full h-full"
           preserveAspectRatio="none"
         >
-          {/* very subtle band between min and max */}
+          {/* subtle band between min and max */}
           <rect
             x="0"
             y={getY(maxVal)}
             width={width}
             height={getY(minVal) - getY(maxVal)}
-            fill="rgba(15,23,42,0.5)"
+            fill="rgba(15,23,42,0.55)"
           />
 
           {/* main line */}
@@ -1391,12 +1390,12 @@ function PfiHistoryChart({ history }) {
             d={pathD}
             fill="none"
             stroke="#22c55e"
-            strokeWidth="0.8"
+            strokeWidth="0.9"
             strokeLinejoin="round"
             strokeLinecap="round"
           />
 
-          {/* points + smaller, softer labels */}
+          {/* points + compact labels */}
           {svgPoints.map((p, idx) => (
             <g key={idx}>
               <circle
@@ -1410,7 +1409,7 @@ function PfiHistoryChart({ history }) {
               {idx % labelStep === 0 && (
                 <text
                   x={p.x}
-                  y={p.y - 2}
+                  y={p.y - 2.5}
                   fontSize="2.2"
                   fill="#cbd5f5"
                   textAnchor="middle"
