@@ -480,8 +480,6 @@ function App() {
   );
 }
 
-/* ---------- Input Details Tab (journey) ---------- */
-
 function InputDetailsTab({
   data,
   update,
@@ -518,7 +516,7 @@ function InputDetailsTab({
     if (ref) {
       ref.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [activeStep]);
+  }, [activeStep]); // no sectionRefs here to avoid unnecessary re-runs
 
   function goToStep(index) {
     setActiveStep(index);
@@ -526,30 +524,45 @@ function InputDetailsTab({
 
   function handleNumberChange(field) {
     return (e) => {
-      const value = Number(e.target.value.replace(/,/g, "")) || 0;
+      const raw = e.target.value ?? "";
+      const cleaned = raw.toString().replace(/,/g, "");
+      const parsed = Number(cleaned);
+      const value = Number.isFinite(parsed) ? parsed : 0;
       update({ [field]: value });
     };
   }
 
-  const totalIncome =
-    data.incomeSelf +
-    data.incomeSpouse +
-    data.incomeOther +
-    data.incomeVariable;
+  // Normalise all numeric fields to avoid NaN
+  const incomeSelf = Number(data.incomeSelf ?? 0);
+  const incomeSpouse = Number(data.incomeSpouse ?? 0);
+  const incomeOther = Number(data.incomeOther ?? 0);
+  const incomeVariable = Number(data.incomeVariable ?? 0);
 
-  const totalExpenses = fixedTotal + variableTotal;
+  const totalIncome =
+    incomeSelf + incomeSpouse + incomeOther + incomeVariable;
+
+  const safeFixedTotal = Number(fixedTotal ?? 0);
+  const safeVariableTotal = Number(variableTotal ?? 0);
+
+  const totalExpenses = safeFixedTotal + safeVariableTotal;
   const monthlySavings = Math.max(totalIncome - totalExpenses, 0);
   const savingsRate = totalIncome > 0 ? monthlySavings / totalIncome : 0;
-  const emiLoad = totalIncome > 0 ? data.totalEmi / totalIncome : 0;
+
+  const totalEmi = Number(data.totalEmi ?? 0);
+  const emiLoad = totalIncome > 0 ? totalEmi / totalIncome : 0;
+
+  const emergencyFund = Number(data.emergencyFund ?? 0);
   const emergencyMonths =
-    totalExpenses > 0 ? data.emergencyFund / totalExpenses : 0;
+    totalExpenses > 0 ? emergencyFund / totalExpenses : 0;
+
+  const invBonds = Number(data.invBonds ?? 0);
+  const invMF = Number(data.invMF ?? 0);
+  const invStocks = Number(data.invStocks ?? 0);
+  const invGold = Number(data.invGold ?? 0);
+  const invOthers = Number(data.invOthers ?? 0);
 
   const totalInvestments =
-  (data.invBonds || 0) +
-  (data.invMF || 0) +
-  (data.invStocks || 0) +
-  (data.invGold || 0) +
-  (data.invOthers || 0);  
+    invBonds + invMF + invStocks + invGold + invOthers;
 
   function savingsLabel() {
     if (savingsRate <= 0.05) return "Very tight – <5% savings";
@@ -656,7 +669,7 @@ function InputDetailsTab({
                 type="number"
                 min={18}
                 max={80}
-                value={data.age}
+                value={data.age ?? 0}
                 onChange={handleNumberChange("age")}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
@@ -670,7 +683,7 @@ function InputDetailsTab({
                 type="number"
                 min={0}
                 max={10}
-                value={data.dependents}
+                value={data.dependents ?? 0}
                 onChange={handleNumberChange("dependents")}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
@@ -684,7 +697,7 @@ function InputDetailsTab({
                 City type
               </label>
               <select
-                value={data.cityTier}
+                value={data.cityTier ?? "metro"}
                 onChange={(e) => update({ cityTier: e.target.value })}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               >
@@ -740,7 +753,7 @@ function InputDetailsTab({
               <input
                 type="number"
                 min={0}
-                value={data.incomeSelf}
+                value={incomeSelf}
                 onChange={handleNumberChange("incomeSelf")}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
@@ -752,7 +765,7 @@ function InputDetailsTab({
               <input
                 type="number"
                 min={0}
-                value={data.incomeSpouse}
+                value={incomeSpouse}
                 onChange={handleNumberChange("incomeSpouse")}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
@@ -764,7 +777,7 @@ function InputDetailsTab({
               <input
                 type="number"
                 min={0}
-                value={data.incomeOther}
+                value={incomeOther}
                 onChange={handleNumberChange("incomeOther")}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
@@ -776,7 +789,7 @@ function InputDetailsTab({
               <input
                 type="number"
                 min={0}
-                value={data.incomeVariable}
+                value={incomeVariable}
                 onChange={handleNumberChange("incomeVariable")}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
@@ -834,7 +847,7 @@ function InputDetailsTab({
                   Fixed expenses (needs)
                 </div>
                 <div className="text-[11px] text-slate-400">
-                  Total: {formatCurrency(fixedTotal)}
+                  Total: {formatCurrency(safeFixedTotal)}
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3">
@@ -845,7 +858,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.fixedRent}
+                    value={data.fixedRent ?? 0}
                     onChange={handleNumberChange("fixedRent")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -857,7 +870,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.fixedFood}
+                    value={data.fixedFood ?? 0}
                     onChange={handleNumberChange("fixedFood")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -869,7 +882,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.fixedUtilities}
+                    value={data.fixedUtilities ?? 0}
                     onChange={handleNumberChange("fixedUtilities")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -881,7 +894,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.fixedMedical}
+                    value={data.fixedMedical ?? 0}
                     onChange={handleNumberChange("fixedMedical")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -895,7 +908,7 @@ function InputDetailsTab({
                   Variable expenses (wants)
                 </div>
                 <div className="text-[11px] text-slate-400">
-                  Total: {formatCurrency(variableTotal)}
+                  Total: {formatCurrency(safeVariableTotal)}
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3">
@@ -906,7 +919,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.varWifi}
+                    value={data.varWifi ?? 0}
                     onChange={handleNumberChange("varWifi")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -918,7 +931,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.varEntertainment}
+                    value={data.varEntertainment ?? 0}
                     onChange={handleNumberChange("varEntertainment")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -930,7 +943,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.varShopping}
+                    value={data.varShopping ?? 0}
                     onChange={handleNumberChange("varShopping")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -942,7 +955,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.varMisc}
+                    value={data.varMisc ?? 0}
                     onChange={handleNumberChange("varMisc")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -1000,7 +1013,7 @@ function InputDetailsTab({
               <input
                 type="number"
                 min={0}
-                value={data.totalEmi}
+                value={totalEmi}
                 onChange={handleNumberChange("totalEmi")}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
@@ -1015,7 +1028,7 @@ function InputDetailsTab({
               <input
                 type="number"
                 min={0}
-                value={data.loanOutstanding}
+                value={data.loanOutstanding ?? 0}
                 onChange={handleNumberChange("loanOutstanding")}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
@@ -1072,7 +1085,9 @@ function InputDetailsTab({
             <div className="text-right text-[11px] text-slate-400">
               Emergency fund
               <div className="text-sm font-semibold text-slate-50">
-                {emergencyMonths ? `${emergencyMonths.toFixed(1)} months` : "—"}
+                {emergencyMonths > 0
+                  ? `${emergencyMonths.toFixed(1)} months`
+                  : "—"}
               </div>
             </div>
           </div>
@@ -1091,7 +1106,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.emergencyFund}
+                    value={emergencyFund}
                     onChange={handleNumberChange("emergencyFund")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -1106,7 +1121,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.healthCover}
+                    value={data.healthCover ?? 0}
                     onChange={handleNumberChange("healthCover")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -1122,7 +1137,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.lifeCover}
+                    value={data.lifeCover ?? 0}
                     onChange={handleNumberChange("lifeCover")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -1152,7 +1167,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.invBonds}
+                    value={invBonds}
                     onChange={handleNumberChange("invBonds")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -1164,7 +1179,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.invMF}
+                    value={invMF}
                     onChange={handleNumberChange("invMF")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -1176,7 +1191,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.invStocks}
+                    value={invStocks}
                     onChange={handleNumberChange("invStocks")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -1188,7 +1203,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.invGold}
+                    value={invGold}
                     onChange={handleNumberChange("invGold")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -1200,7 +1215,7 @@ function InputDetailsTab({
                   <input
                     type="number"
                     min={0}
-                    value={data.invOthers}
+                    value={invOthers}
                     onChange={handleNumberChange("invOthers")}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
@@ -1250,7 +1265,9 @@ function InputDetailsTab({
         <p className="text-[11px] md:text-xs text-slate-300">
           Emergency fund:{" "}
           <span className="font-semibold">
-            {emergencyMonths ? `${emergencyMonths.toFixed(1)} months` : "0"}
+            {emergencyMonths > 0
+              ? `${emergencyMonths.toFixed(1)} months`
+              : "0"}
           </span>{" "}
           · {emergencyLabel()}
         </p>
@@ -1342,6 +1359,7 @@ function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
 }
 
 // Tiny SVG chart with PFI labels on each point
+// Tiny SVG chart with PFI labels on each point
 function PfiHistoryChart({ history }) {
   if (!history || history.length === 0) {
     return (
@@ -1374,7 +1392,7 @@ function PfiHistoryChart({ history }) {
     const pfi = Math.round(h.pfi);
     const x =
       history.length === 1 ? 50 : (idx / (history.length - 1)) * 100;
-    const y = 90 - ((pfi - minPfi) / range) * 60; // 30–90 vertical span
+    const y = 88 - ((pfi - minPfi) / range) * 60; // 28–88 vertical span
     return { x, y, pfi, created_at: h.created_at };
   });
 
@@ -1410,39 +1428,67 @@ function PfiHistoryChart({ history }) {
         <polyline
           fill="none"
           stroke="#22c55e"
-          strokeWidth="0.8"
+          strokeWidth="1.2"
           points={polylinePoints}
         />
 
-        {/* Points + numeric labels */}
-        {points.map((p, idx) => (
-          <g key={idx}>
-            <circle
-              cx={p.x}
-              cy={p.y}
-              r="1.4"
-              fill="#22c55e"
-              stroke="#0f172a"
-              strokeWidth="0.4"
-            />
-            <text
-              x={p.x}
-              y={p.y - 3}
-              textAnchor="middle"
-              fontSize="3"
-              fill="#e2e8f0"
-            >
-              {p.pfi}
-            </text>
-          </g>
-        ))}
+        {/* Points + pill labels */}
+        {points.map((p, idx) => {
+          const label = String(p.pfi);
+          const charWidth = 2.6; // SVG units per char
+          const paddingX = 1.5;
+          const paddingY = 1.2;
+          const boxWidth = label.length * charWidth + paddingX * 2;
+          const boxHeight = 6; // SVG units
+          const boxX = p.x - boxWidth / 2;
+          const boxY = p.y - boxHeight - 3; // 3 units above the dot
+
+          return (
+            <g key={idx}>
+              {/* point */}
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r="1.8"
+                fill="#22c55e"
+                stroke="#020617"
+                strokeWidth="0.6"
+              />
+
+              {/* pill background */}
+              <rect
+                x={boxX}
+                y={boxY}
+                width={boxWidth}
+                height={boxHeight}
+                rx={boxHeight / 2}
+                ry={boxHeight / 2}
+                fill="#020617"
+                stroke="#22c55e"
+                strokeWidth="0.5"
+              />
+
+              {/* label text */}
+              <text
+                x={p.x}
+                y={boxY + boxHeight / 2 + 0.4}
+                textAnchor="middle"
+                fontSize="3"
+                fill="#e2e8f0"
+                dominantBaseline="middle"
+              >
+                {label}
+              </text>
+            </g>
+          );
+        })}
 
         {/* Baseline */}
         <line
           x1="0"
-          y1="92"
+          y1="93"
           x2="100"
-          y2="92"
+          y2="93"
           stroke="#1e293b"
           strokeWidth="0.4"
         />
