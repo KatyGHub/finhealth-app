@@ -1363,128 +1363,212 @@ function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
   );
 }
 
-// Taller, minimal PFI history chart with scores along bottom baseline
-function PfiHistoryChart({ history }) {
-  if (!history || history.length === 0) {
+type PfiCheckpoint = {
+  date: string;     // ISO string or anything new Date(...) can parse
+  score: number;    // 0–100
+};
+
+type PFIHistoryChartProps = {
+  checkpoints: PfiCheckpoint[];
+};
+
+export function PFIHistoryChart({ checkpoints }: PFIHistoryChartProps) {
+  if (!checkpoints || checkpoints.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[220px] text-xs text-slate-500">
-        No checkpoints yet. Save your first PFI checkpoint to see progress.
+      <div className="flex h-48 items-center justify-center text-xs text-slate-500">
+        No checkpoints yet. Save your first PFI checkpoint to see history.
       </div>
     );
   }
 
-  if (history.length === 1) {
-    const value = Math.round(history[0].pfi);
-    return (
-      <div className="flex flex-col items-center justify-center h-[220px] text-xs text-slate-500">
-        <div className="mb-2">
-          Only one checkpoint so far. Add a few more to see a proper trend.
-        </div>
-        <div className="flex items-center gap-2 text-emerald-400 text-sm">
-          ● <span>PFI {value}</span>
-        </div>
-      </div>
-    );
-  }
+  // Basic geometry (SVG units)
+  const svgWidth = 1000;
+  const svgHeight = 260;
 
-  const sorted = [...history].sort(
-    (a, b) => new Date(a.created_at) - new Date(b.created_at)
-  );
+  const chartLeft = 70;   // leave room for y-axis + label
+  const chartRight = 960;
+  const chartTop = 20;
+  const chartBottom = 220;
 
-  const values = sorted.map((h) => Number(h.pfi) || 0);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
+  const chartWidth = chartRight - chartLeft;
+  const chartHeight = chartBottom - chartTop;
 
-  // Use more vertical space now that the chart is taller
-  const topY = 15;
-  const bottomY = 65;
-  const baselineY = 90; // bottom baseline for score labels
+  const maxScore = 100;
+  const minScore = 0;
 
-  const points = sorted.map((h, idx) => {
-    const pfi = Number(h.pfi) || 0;
-    const x =
-      sorted.length === 1 ? 50 : (idx / (sorted.length - 1)) * 100;
-    const norm = (pfi - min) / range; // 0..1
-    const y = bottomY - norm * (bottomY - topY);
-    return { x, y, pfi, created_at: h.created_at };
+  const clampScore = (v: number) =>
+    Math.min(maxScore, Math.max(minScore, v));
+
+  const xStep =
+    checkpoints.length > 1 ? chartWidth / (checkpoints.length - 1) : 0;
+
+  const getX = (index: number) => chartLeft + index * xStep;
+
+  const getY = (score: number) => {
+    const value = clampScore(score);
+    const ratio = (value - minScore) / (maxScore - minScore || 1);
+    return chartBottom - ratio * chartHeight;
+  };
+
+  // Build line path
+  const linePath = checkpoints
+    .map((cp, i) => {
+      const x = getX(i);
+      const y = getY(cp.score);
+      return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+    })
+    .join(" ");
+
+  // X-axis labels: compact dates, show every Nth to avoid clutter
+  const formatter = new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
   });
 
-  const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(" ");
+  const labelEvery =
+    checkpoints.length <= 6
+      ? 1
+      : checkpoints.length <= 12
+      ? 2
+      : 3;
 
   return (
-    <div className="h-[220px] w-full">
+    <div className="relative mt-4 h-[260px] w-full">
       <svg
-        viewBox="0 0 100 100"
-        className="w-full h-full"
+        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+        className="h-full w-full"
         preserveAspectRatio="none"
       >
-        {/* background */}
-        <rect x="0" y="0" width="100" height="100" fill="transparent" />
-
-        {/* subtle mid reference line */}
-        <line
-          x1="0"
-          y1={(topY + bottomY) / 2}
-          x2="100"
-          y2={(topY + bottomY) / 2}
-          stroke="#1e293b"
-          strokeWidth="0.3"
+        {/* Background */}
+        <rect
+          x={0}
+          y={0}
+          width={svgWidth}
+          height={svgHeight}
+          fill="transparent"
         />
 
-        {/* bottom baseline for labels (your “red line”) */}
+        {/* Axes */}
+        {/* Y axis */}
         <line
-          x1="0"
-          y1={baselineY}
-          x2="100"
-          y2={baselineY}
-          stroke="#0f172a"
-          strokeWidth="0.5"
+          x1={chartLeft}
+          y1={chartTop}
+          x2={chartLeft}
+          y2={chartBottom}
+          stroke="#1f2937"
+          strokeWidth={1}
+        />
+        {/* X axis */}
+        <line
+          x1={chartLeft}
+          y1={chartBottom}
+          x2={chartRight}
+          y2={chartBottom}
+          stroke="#1f2937"
+          strokeWidth={1}
         />
 
-        {/* main PFI line */}
-        <polyline
+        {/* Y-axis ticks and labels (0, 50, 100) */}
+        {[0, 50, 100].map((value) => {
+          const y = getY(value);
+          return (
+            <g key={value}>
+              <line
+                x1={chartLeft - 5}
+                y1={y}
+                x2={chartLeft}
+                y2={y}
+                stroke="#4b5563"
+                strokeWidth={1}
+              />
+              <text
+                x={chartLeft - 10}
+                y={y + 3}
+                textAnchor="end"
+                fontSize="10"
+                fill="#9ca3af"
+              >
+                {value}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Y-axis label (rotated) */}
+        <text
+          x={20}
+          y={(chartTop + chartBottom) / 2}
+          textAnchor="middle"
+          fontSize="11"
+          fill="#6b7280"
+          transform={`rotate(-90 20 ${(chartTop + chartBottom) / 2})`}
+        >
+          PFI SCORE
+        </text>
+
+        {/* X-axis labels */}
+        {checkpoints.map((cp, i) => {
+          if (i % labelEvery !== 0 && i !== checkpoints.length - 1) {
+            return null;
+          }
+          const x = getX(i);
+          const label = (() => {
+            try {
+              return formatter.format(new Date(cp.date));
+            } catch {
+              return cp.date;
+            }
+          })();
+
+          return (
+            <g key={cp.date + i}>
+              <line
+                x1={x}
+                y1={chartBottom}
+                x2={x}
+                y2={chartBottom + 4}
+                stroke="#4b5563"
+                strokeWidth={1}
+              />
+              <text
+                x={x}
+                y={chartBottom + 16}
+                textAnchor="middle"
+                fontSize="10"
+                fill="#9ca3af"
+              >
+                {label}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Line */}
+        <path
+          d={linePath}
           fill="none"
           stroke="#22c55e"
-          strokeWidth="1.2"
-          points={polylinePoints}
+          strokeWidth={3}
+          strokeLinejoin="round"
+          strokeLinecap="round"
         />
 
-        {/* points + thin guides down towards baseline */}
-        {points.map((p, idx) => (
-          <g key={idx}>
+        {/* Optional subtle markers for each point */}
+        {checkpoints.map((cp, i) => {
+          const x = getX(i);
+          const y = getY(cp.score);
+          return (
             <circle
-              cx={p.x}
-              cy={p.y}
-              r="1.6"
+              key={cp.date + i}
+              cx={x}
+              cy={y}
+              r={4}
               fill="#22c55e"
               stroke="#020617"
-              strokeWidth="0.5"
+              strokeWidth={2}
             />
-            <line
-              x1={p.x}
-              y1={p.y + 2}
-              x2={p.x}
-              y2={baselineY - 3}
-              stroke="#1e293b"
-              strokeWidth="0.25"
-            />
-          </g>
-        ))}
-
-        {/* scores along the bottom baseline */}
-        {points.map((p, idx) => (
-          <text
-            key={`label-${idx}`}
-            x={p.x}
-            y={baselineY - 1.5}
-            textAnchor="middle"
-            fontSize="2.2"
-            fill="#94a3b8" // softer label color
-          >
-            {Math.round(p.pfi)}
-          </text>
-        ))}
+          );
+        })}
       </svg>
     </div>
   );
