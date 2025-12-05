@@ -1363,74 +1363,65 @@ function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
   );
 }
 
-type PfiCheckpoint = {
-  date: string;     // ISO string or anything new Date(...) can parse
-  score: number;    // 0–100
-};
-
-type PFIHistoryChartProps = {
-  checkpoints: PfiCheckpoint[];
-};
-
-export function PFIHistoryChart({ checkpoints }: PFIHistoryChartProps) {
+// Replace your existing PFIHistoryChart with this
+function PFIHistoryChart({ checkpoints }) {
   if (!checkpoints || checkpoints.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-xs text-slate-500">
         No checkpoints yet. Save your first PFI checkpoint to see history.
       </div>
-    );
+    )
   }
 
-  // Basic geometry (SVG units)
-  const svgWidth = 1000;
-  const svgHeight = 260;
+  // SVG geometry
+  const svgWidth = 1000
+  const svgHeight = 260
 
-  const chartLeft = 70;   // leave room for y-axis + label
-  const chartRight = 960;
-  const chartTop = 20;
-  const chartBottom = 220;
+  const chartLeft = 70   // room for y-axis + label
+  const chartRight = 960
+  const chartTop = 20
+  const chartBottom = 220
 
-  const chartWidth = chartRight - chartLeft;
-  const chartHeight = chartBottom - chartTop;
+  const chartWidth = chartRight - chartLeft
+  const chartHeight = chartBottom - chartTop
 
-  const maxScore = 100;
-  const minScore = 0;
+  const maxScore = 100
+  const minScore = 0
 
-  const clampScore = (v: number) =>
-    Math.min(maxScore, Math.max(minScore, v));
+  const clampScore = (v) => Math.min(maxScore, Math.max(minScore, v))
 
   const xStep =
-    checkpoints.length > 1 ? chartWidth / (checkpoints.length - 1) : 0;
+    checkpoints.length > 1 ? chartWidth / (checkpoints.length - 1) : 0
 
-  const getX = (index: number) => chartLeft + index * xStep;
+  const getX = (index) => chartLeft + index * xStep
 
-  const getY = (score: number) => {
-    const value = clampScore(score);
-    const ratio = (value - minScore) / (maxScore - minScore || 1);
-    return chartBottom - ratio * chartHeight;
-  };
+  const getY = (score) => {
+    const value = clampScore(score)
+    const ratio = (value - minScore) / (maxScore - minScore || 1)
+    return chartBottom - ratio * chartHeight
+  }
 
-  // Build line path
+  // Line path
   const linePath = checkpoints
     .map((cp, i) => {
-      const x = getX(i);
-      const y = getY(cp.score);
-      return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+      const x = getX(i)
+      const y = getY(cp.score)
+      return `${i === 0 ? "M" : "L"} ${x} ${y}`
     })
-    .join(" ");
+    .join(" ")
 
-  // X-axis labels: compact dates, show every Nth to avoid clutter
+  // X-axis labels: compact dates
   const formatter = new Intl.DateTimeFormat("en-IN", {
     day: "2-digit",
     month: "short",
-  });
+  })
 
   const labelEvery =
     checkpoints.length <= 6
       ? 1
       : checkpoints.length <= 12
       ? 2
-      : 3;
+      : 3
 
   return (
     <div className="relative mt-4 h-[260px] w-full">
@@ -1470,7 +1461,7 @@ export function PFIHistoryChart({ checkpoints }: PFIHistoryChartProps) {
 
         {/* Y-axis ticks and labels (0, 50, 100) */}
         {[0, 50, 100].map((value) => {
-          const y = getY(value);
+          const y = getY(value)
           return (
             <g key={value}>
               <line
@@ -1491,7 +1482,7 @@ export function PFIHistoryChart({ checkpoints }: PFIHistoryChartProps) {
                 {value}
               </text>
             </g>
-          );
+          )
         })}
 
         {/* Y-axis label (rotated) */}
@@ -1508,17 +1499,15 @@ export function PFIHistoryChart({ checkpoints }: PFIHistoryChartProps) {
 
         {/* X-axis labels */}
         {checkpoints.map((cp, i) => {
-          if (i % labelEvery !== 0 && i !== checkpoints.length - 1) {
-            return null;
+          if (i % labelEvery !== 0 && i !== checkpoints.length - 1) return null
+
+          const x = getX(i)
+          let label
+          try {
+            label = formatter.format(new Date(cp.date))
+          } catch {
+            label = cp.date
           }
-          const x = getX(i);
-          const label = (() => {
-            try {
-              return formatter.format(new Date(cp.date));
-            } catch {
-              return cp.date;
-            }
-          })();
 
           return (
             <g key={cp.date + i}>
@@ -1540,7 +1529,7 @@ export function PFIHistoryChart({ checkpoints }: PFIHistoryChartProps) {
                 {label}
               </text>
             </g>
-          );
+          )
         })}
 
         {/* Line */}
@@ -1553,10 +1542,10 @@ export function PFIHistoryChart({ checkpoints }: PFIHistoryChartProps) {
           strokeLinecap="round"
         />
 
-        {/* Optional subtle markers for each point */}
+        {/* Point markers */}
         {checkpoints.map((cp, i) => {
-          const x = getX(i);
-          const y = getY(cp.score);
+          const x = getX(i)
+          const y = getY(cp.score)
           return (
             <circle
               key={cp.date + i}
@@ -1567,11 +1556,11 @@ export function PFIHistoryChart({ checkpoints }: PFIHistoryChartProps) {
               stroke="#020617"
               strokeWidth={2}
             />
-          );
+          )
         })}
       </svg>
     </div>
-  );
+  )
 }
 
 function ScoreTab({
