@@ -1363,11 +1363,11 @@ function PillarBar({ label, score, maxScore, suffix, valueText, meta }) {
   );
 }
 
-// Minimal PFI history line chart with scores along bottom baseline
+// Taller, minimal PFI history chart with scores along bottom baseline
 function PfiHistoryChart({ history }) {
   if (!history || history.length === 0) {
     return (
-      <div className="flex items-center justify-center h-40 text-xs text-slate-500">
+      <div className="flex items-center justify-center h-[220px] text-xs text-slate-500">
         No checkpoints yet. Save your first PFI checkpoint to see progress.
       </div>
     );
@@ -1376,7 +1376,7 @@ function PfiHistoryChart({ history }) {
   if (history.length === 1) {
     const value = Math.round(history[0].pfi);
     return (
-      <div className="flex flex-col items-center justify-center h-40 text-xs text-slate-500">
+      <div className="flex flex-col items-center justify-center h-[220px] text-xs text-slate-500">
         <div className="mb-2">
           Only one checkpoint so far. Add a few more to see a proper trend.
         </div>
@@ -1396,9 +1396,10 @@ function PfiHistoryChart({ history }) {
   const max = Math.max(...values);
   const range = max - min || 1;
 
-  const topY = 20;
-  const bottomY = 80;
-  const baselineY = 93; // bottom baseline for score labels
+  // Use more vertical space now that the chart is taller
+  const topY = 15;
+  const bottomY = 65;
+  const baselineY = 90; // bottom baseline for score labels
 
   const points = sorted.map((h, idx) => {
     const pfi = Number(h.pfi) || 0;
@@ -1412,7 +1413,7 @@ function PfiHistoryChart({ history }) {
   const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(" ");
 
   return (
-    <div className="h-40 w-full">
+    <div className="h-[220px] w-full">
       <svg
         viewBox="0 0 100 100"
         className="w-full h-full"
@@ -1441,7 +1442,7 @@ function PfiHistoryChart({ history }) {
           strokeWidth="0.5"
         />
 
-        {/* main line */}
+        {/* main PFI line */}
         <polyline
           fill="none"
           stroke="#22c55e"
@@ -1449,7 +1450,7 @@ function PfiHistoryChart({ history }) {
           points={polylinePoints}
         />
 
-        {/* points */}
+        {/* points + thin guides down towards baseline */}
         {points.map((p, idx) => (
           <g key={idx}>
             <circle
@@ -1460,14 +1461,13 @@ function PfiHistoryChart({ history }) {
               stroke="#020617"
               strokeWidth="0.5"
             />
-            {/* subtle guide from point down towards baseline */}
             <line
               x1={p.x}
               y1={p.y + 2}
               x2={p.x}
               y2={baselineY - 3}
               stroke="#1e293b"
-              strokeWidth="0.3"
+              strokeWidth="0.25"
             />
           </g>
         ))}
@@ -1479,8 +1479,8 @@ function PfiHistoryChart({ history }) {
             x={p.x}
             y={baselineY - 1.5}
             textAnchor="middle"
-            fontSize="2.4"
-            fill="#e2e8f0"
+            fontSize="2.2"
+            fill="#94a3b8" // softer label color
           >
             {Math.round(p.pfi)}
           </text>
