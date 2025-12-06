@@ -3530,10 +3530,14 @@ function AuthLanding({ onLogin }) {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4">
       <div className="max-w-xl w-full rounded-3xl border border-slate-800 bg-slate-900/80 p-6 md:p-8 space-y-6">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-sm font-semibold text-emerald-300">
-            FH
-          </div>
-          <div>
+    <div className="h-9 w-9 rounded-xl overflow-hidden bg-slate-900 border border-emerald-400/40 flex items-center justify-center">
+      <img
+        src="/vite.svg"
+        alt="Findependence logo"
+        className="h-7 w-7 object-contain"
+      />
+    </div>
+    <div>
             <div className="text-lg font-semibold tracking-wide">
               Findependence – Build Wealth. Retire Earlier.
             </div>
